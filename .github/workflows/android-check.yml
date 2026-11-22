@@ -1,0 +1,37 @@
+name: Android internal checks
+on:
+  push:
+    branches: [main, fix/internal-receptionist-catalog-history]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.3.1'
+      - name: Install Android platform
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+      - name: Generate disposable debug signing key
+        run: |
+          if [ ! -f debug.keystore ]; then
+            keytool -genkeypair -keystore debug.keystore -storepass android -keypass android -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 30 -dname "CN=Internal CI"
+          fi
+      - name: Build and test without production Firebase
+        run: gradle --stacktrace :app:assembleDebug :app:testDebugUnitTest -x :app:processDebugGoogleServices
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-test-results
+          path: app/build/reports/tests/testDebugUnitTest
+          if-no-files-found: ignore
