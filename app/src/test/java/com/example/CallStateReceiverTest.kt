@@ -24,9 +24,9 @@ class CallStateReceiverTest {
     val executionOrder = mutableListOf<String>()
     var savedSummaryInSupabase = ""
 
-    val resultCall = CallStateReceiver.processPhoneStateChange(
+    suspend fun event(state: String) = CallStateReceiver.processPhoneStateChange(
       context = context,
-      state = TelephonyManager.EXTRA_STATE_RINGING,
+      state = state,
       incomingNumber = "+1 (808) 555-7744",
       callerNameOverride = "Koa Martinez",
       transcriptOverride = "Urgent VIP: Looking for Big Kahuna $3,997 multi-agent setup ASAP.",
@@ -48,6 +48,11 @@ class CallStateReceiverTest {
       }
     )
 
+    assertEquals(null, event(TelephonyManager.EXTRA_STATE_RINGING))
+    assertEquals(null, event(TelephonyManager.EXTRA_STATE_RINGING))
+    assertEquals(null, event(TelephonyManager.EXTRA_STATE_OFFHOOK))
+    val resultCall = event(TelephonyManager.EXTRA_STATE_IDLE)
+    assertEquals(null, event(TelephonyManager.EXTRA_STATE_IDLE))
     assertNotNull(resultCall)
     assertEquals(listOf("gemini_flash_summarize", "supabase_save"), executionOrder)
     assertTrue(savedSummaryInSupabase.contains("Topic: Big Kahuna VIP"))
