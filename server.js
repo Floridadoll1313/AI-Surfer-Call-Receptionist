@@ -15,7 +15,7 @@ let escalationTriggerConfig = {
 
 let escalationDispatches = [];
 
-let calls = [
+const demoCalls = [
   {
     id: 1,
     callerName: "Elena Vance",
@@ -86,6 +86,10 @@ let calls = [
   }
 ];
 
+let calls = process.env.RECEPTIONIST_DEMO === "1"
+  ? demoCalls.map(call => ({ ...call, source: "seeded-demo" }))
+  : [];
+
 let products = [
   {
     id: 1,
@@ -103,14 +107,14 @@ let products = [
   {
     id: 2,
     name: "AI Opportunity Report™",
-    price: 0.0,
+    price: 297.0,
     category: "Business AI Strategy",
     description:
       "Turn scattered AI possibilities into a prioritized list of the opportunities most likely to create measurable business value.",
     popularBadge: "Core Diagnosis",
-    surfLevel: "Stage: Diagnose (Free Tier)",
+    surfLevel: "Stage: Diagnose ($297)",
     ctaText: "Explore Opportunities",
-    directUrl: "https://otdaisurfer.surf/members/products/ai-opportunity-report",
+    directUrl: "https://buy.stripe.com/14A4gz2pt0WSfPs1tt4gg0f",
     slug: "ai-opportunity-report"
   },
   {
@@ -181,12 +185,12 @@ let products = [
   {
     id: 8,
     name: "AEO Blueprint™",
-    price: 1997.0,
+    price: 497.0,
     category: "AI Search Strategy",
     description:
       "Build a practical roadmap for becoming more visible, understandable, and authoritative across AI-powered search engines (ChatGPT, Perplexity, Gemini, Claude).",
     popularBadge: "Answer Engine SEO",
-    surfLevel: "Stage: Plan (Wave Builder)",
+    surfLevel: "Stage: Plan ($497)",
     ctaText: "Build the Blueprint",
     directUrl: "https://otdaisurfer.surf/members/products/aeo-blueprint",
     slug: "aeo-blueprint"
@@ -348,6 +352,7 @@ function generateAiSurferResponse(callerName = "Inquirer", question = "") {
   const matchedProd = products.find(p =>
     q.includes(p.name.toLowerCase()) ||
     (q.includes("wave check") && p.slug === "wave-check") ||
+    (q.includes("opportunity report") && p.slug === "ai-opportunity-report") ||
     (q.includes("wave starter") && p.slug === "wave-starter") ||
     (q.includes("scout") && p.slug === "wave-scout") ||
     (q.includes("rider") && p.slug === "sales-rider") ||
@@ -473,6 +478,7 @@ const server = http.createServer(async (req, res) => {
       const alertMinutes = ai.urgency === "URGENT_VIP" ? 3 : 10;
       const now = Date.now();
       const newCall = {
+        source: "simulation",
         id: now,
         callerName,
         callerNumber,
@@ -745,7 +751,7 @@ function getAppHtml() {
         <div class="card" style="border-left: 4px solid \${c.status === 'ESCALATED' ? 'var(--coral-alert)' : c.status === 'PENDING_REVIEW' ? 'var(--sunset-orange)' : 'var(--sea-green)'}">
           <div style="display:flex;justify-content:space-between;align-items:center;">
             <strong>\${c.callerName} (\${c.callerNumber})</strong>
-            <span>\${c.status} • \${c.urgency}</span>
+            <span>\${c.source === "seeded-demo" ? "Demo fixture" : c.source === "simulation" ? "Simulation" : "Unverified origin"} • \${c.status} • \${c.urgency}</span>
           </div>
           <p style="margin:8px 0;color:var(--sand-secondary)">\${c.summary}</p>
           \${c.escalationNotes ? \`<div style="color:var(--coral-alert);font-size:0.85rem;margin-bottom:8px;">⚠️ \${c.escalationNotes}</div>\` : ''}
