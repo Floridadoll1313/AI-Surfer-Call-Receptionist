@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ocean Tide Drop AI Surfer — Ride the Wave, Grow with AI</title>
+  <meta name="description" content="AI Phone Receptionist, Call Summaries powered by ChatGPT & Gemini AI Logic, and Supabase Call Analytics for Ocean Tide Drop AI Surfer." />
+  <style>
+    :root {
+      --ocean-abyss: #03141F;
+      --ocean-deep: #062335;
+      --ocean-surface: #0A3049;
+      --ocean-card: #0F3E5C;
+      --surf-turquoise: #00E5FF;
+      --surf-cyan: #00B4D8;
+      --surf-teal: #0077B6;
+      --golden-sun: #FFB703;
+      --sunset-orange: #FB8500;
+      --sea-green: #06D6A0;
+      --sand-primary: #F1FAEE;
+      --sand-secondary: #90E0EF;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--ocean-abyss);
+      color: var(--sand-primary);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, sans-serif;
+      line-height: 1.6;
+    }
+
+    .hero {
+      background: radial-gradient(circle at top right, rgba(0, 229, 255, 0.16), transparent 45%),
+                  linear-gradient(180deg, #020D14 0%, var(--ocean-deep) 65%, var(--ocean-card) 100%);
+      padding: 64px 20px 88px;
+      position: relative;
+      overflow: hidden;
+      border-bottom: 2px solid rgba(0, 229, 255, 0.25);
+    }
+
+    .wave-divider {
+      position: absolute;
+      bottom: -1px;
+      left: 0;
+      width: 100%;
+      height: 54px;
+      fill: var(--ocean-abyss);
+    }
+
+    .container {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 0 20px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(0, 229, 255, 0.12);
+      border: 1px solid rgba(0, 229, 255, 0.4);
+      color: var(--surf-turquoise);
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      font-size: clamp(2rem, 5vw, 3.2rem);
+      line-height: 1.15;
+      font-weight: 800;
+      color: #ffffff;
+      margin-bottom: 16px;
+    }
+
+    .accent { color: var(--surf-turquoise); }
+    .gold { color: var(--golden-sun); }
+
+    .subtitle {
+      max-width: 680px;
+      color: var(--sand-secondary);
+      font-size: 1.1rem;
+      margin-bottom: 28px;
+    }
+
+    .cta-row {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 13px 22px;
+      border-radius: 12px;
+      font-weight: 700;
+      text-decoration: none;
+      font-size: 0.95rem;
+      transition: transform 0.15s ease, opacity 0.15s ease;
+    }
+    .btn:hover { transform: translateY(-2px); opacity: 0.95; }
+    .btn-primary { background: var(--surf-turquoise); color: var(--ocean-abyss); }
+    .btn-gold { background: var(--golden-sun); color: var(--ocean-abyss); }
+    .btn-outline { background: rgba(15, 62, 92, 0.65); color: var(--sand-primary); border: 1px solid var(--surf-cyan); }
+
+    section { padding: 56px 0; }
+    h2 {
+      font-size: 1.75rem;
+      color: #ffffff;
+      margin-bottom: 10px;
+    }
+    .section-lead {
+      color: var(--sand-secondary);
+      margin-bottom: 28px;
+      max-width: 720px;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+    }
+
+    .card {
+      background: var(--ocean-deep);
+      border: 1px solid rgba(0, 180, 216, 0.3);
+      border-radius: 18px;
+      padding: 24px;
+    }
+
+    .card h3 {
+      color: #ffffff;
+      font-size: 1.15rem;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card p {
+      color: var(--sand-secondary);
+      font-size: 0.93rem;
+    }
+
+    .pill-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+    }
+    .pill {
+      background: var(--ocean-card);
+      color: var(--surf-turquoise);
+      border: 1px solid rgba(0, 229, 255, 0.25);
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
+
+    .schema-box {
+      background: #020D14;
+      border: 1px solid rgba(0, 180, 216, 0.35);
+      border-radius: 14px;
+      padding: 18px;
+      overflow-x: auto;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.82rem;
+      color: var(--sand-secondary);
+      margin-top: 18px;
+    }
+
+    footer {
+      border-top: 1px solid rgba(0, 180, 216, 0.22);
+      background: #020D14;
+      padding: 28px 20px;
+      text-align: center;
+      color: var(--sand-secondary);
+      font-size: 0.85rem;
+    }
+    footer a { color: var(--surf-turquoise); text-decoration: none; }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <div class="container">
+      <div class="badge">🏄‍♂️ Ocean Tide Drop AI Surfer • otdaisurfer/AISurfer-</div>
+      <h1>Ride the Wave. <span class="accent">Answer Every Call</span> with <span class="gold">AI Precision.</span></h1>
+      <p class="subtitle">
+        Ocean Tide Drop AI Surfer equips coastal and growth-minded businesses with an always-on AI phone receptionist ("Kai"),
+        structured ChatGPT &amp; Gemini call summaries, instant human escalation alerts, and real-time Supabase cloud logging.
+      </p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="https://otdaisurfer.surf/wave-check">Start Free AI Wave Check™</a>
+        <a class="btn btn-gold" href="https://buy.stripe.com/aFa8wP7JN3500Uy1tt4gg0b">Launch Wave Starter™ ($497)</a>
+        <a class="btn btn-outline" href="https://github.com/otdaisurfer/AISurfer-">View GitHub Repo</a>
+      </div>
+    </div>
+    <svg class="wave-divider" viewBox="0 0 1200 120" preserveAspectRatio="none">
+      <path d="M0,20 C180,105 380,-30 600,52 C820,130 1020,10 1200,48 L1200,120 L0,120 Z"></path>
+    </svg>
+  </header>
+
+  <main class="container">
+    <section>
+      <h2>Core Capabilities &amp; Integrations</h2>
+      <p class="section-lead">
+        Built with Jetpack Compose, Firebase AI Logic (Gemini 3.8 Flash), OpenAI ChatGPT, and Supabase PostgREST for seamless mobile and cloud operations.
+      </p>
+      <div class="grid-3">
+        <article class="card">
+          <h3>🤖 ChatGPT &amp; Gemini Call Summaries</h3>
+          <p>
+            Every intercepted call is distilled automatically into a crisp executive summary capturing the
+            <strong>main topic</strong>, prioritized <strong>action items</strong>, and overall <strong>conversation sentiment</strong>.
+          </p>
+          <div class="pill-list">
+            <span class="pill">OpenAI gpt-4o-mini / gpt-4o</span>
+            <span class="pill">Gemini 3.8 Flash</span>
+            <span class="pill">Sentiment Triage</span>
+          </div>
+        </article>
+
+        <article class="card">
+          <h3>⚡ Supabase Ocean Surfer Schema</h3>
+          <p>
+            Incoming calls sync via PostgREST to our Ocean Surfer PostgreSQL schema (<code>public.calls</code> &amp; <code>public.swell_call_logs</code>),
+            logging <code>caller_id</code>, <code>call_timestamp</code>, <code>duration_seconds</code>, and <code>chatgpt_summary</code> alongside Wave Audit leads.
+          </p>
+          <div class="pill-list">
+            <span class="pill">public.swell_call_logs</span>
+            <span class="pill">wave_audit_leads</span>
+            <span class="pill">Row Level Security</span>
+          </div>
+        </article>
+
+        <article class="card">
+          <h3>🚨 Smart Call Dashboard &amp; Alerts</h3>
+          <p>
+            Filter live swells by status (Pending, Escalated, Reviewed, Urgent VIP) and trigger instant email alerts
+            to <strong>oceantidedropservice@gmail.com</strong> or high-priority push notifications whenever AI detects urgency.
+          </p>
+          <div class="pill-list">
+            <span class="pill">Status Filters</span>
+            <span class="pill">SLA Escalation</span>
+            <span class="pill">Email + Push</span>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>Ocean Surfer Supabase Schema Preview</h2>
+      <p class="section-lead">
+        Tailored PostgreSQL schema powering incoming call logs, AI summaries, and lead generation from <a href="https://otdaisurfer.surf" style="color: var(--surf-turquoise);">otdaisurfer.surf</a>.
+      </p>
+      <pre class="schema-box">CREATE TABLE public.calls (
+    id BIGSERIAL PRIMARY KEY,
+    caller_id VARCHAR(120) GENERATED ALWAYS AS (caller_name || ' &lt;' || caller_number || '&gt;') STORED,
+    call_timestamp TIMESTAMPTZ DEFAULT NOW(),
+    duration_seconds INT DEFAULT 0,
+    main_topic VARCHAR(120),
+    action_items TEXT,
+    conversation_sentiment VARCHAR(40) DEFAULT 'Positive',
+    chatgpt_summary TEXT,
+    status VARCHAR(30) DEFAULT 'PENDING_REVIEW',
+    is_escalated BOOLEAN DEFAULT FALSE
+);</pre>
+    </section>
+  </main>
+
+  <footer>
+    Ocean Tide Drop AI Surfer • <a href="https://otdaisurfer.surf">otdaisurfer.surf</a> •
+    <a href="https://github.com/otdaisurfer/AISurfer-">GitHub: otdaisurfer/AISurfer-</a> •
+    Crew Escalations: <a href="mailto:oceantidedropservice@gmail.com">oceantidedropservice@gmail.com</a>
+  </footer>
+</body>
+</html>

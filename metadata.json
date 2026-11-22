@@ -1,0 +1,6 @@
+{
+  "name": "Ocean Tide Drop AI Surfer",
+  "description": "AI cell phone receptionist for Ocean Tide Drop Surfer with ChatGPT, Supabase, GitHub website integration and call escalation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">Ocean Tide Drop AI Surfer</string>
+    <string name="tagline">AI Phone Receptionist &amp; Swell Hub</string>
+    <string name="nav_receptionist">Live Receptionist</string>
+    <string name="nav_calls">Calls &amp; Alerts</string>
+    <string name="nav_products">AI Catalog</string>
+    <string name="nav_integrations">Integrations</string>
+    <string name="receptionist_status_active">AI Receptionist Active &amp; Guarding Swells</string>
+    <string name="escalation_alert_title">⚠️ Ocean Tide Drop Alert</string>
+    <string name="escalation_alert_body">Incoming call message unreviewed! Immediate attention required.</string>
+</resources>
