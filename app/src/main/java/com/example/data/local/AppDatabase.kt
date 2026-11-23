@@ -51,6 +51,8 @@ abstract class AppDatabase : RoomDatabase() {
 
       override fun onOpen(db: SupportSQLiteDatabase) {
         super.onOpen(db)
+        db.execSQL("UPDATE products SET price = 297.0, surfLevel = 'Stage: Diagnose (\$297)', directUrl = 'https://buy.stripe.com/14A4gz2pt0WSfPs1tt4gg0f' WHERE slug = 'ai-opportunity-report' AND price = 0.0 AND surfLevel = 'Stage: Diagnose (Free Tier)'")
+        db.execSQL("UPDATE products SET price = 497.0, surfLevel = 'Stage: Plan (\$497)' WHERE slug = 'aeo-blueprint' AND price = 1997.0 AND surfLevel = 'Stage: Plan (Wave Builder)'")
         INSTANCE?.let { database ->
           CoroutineScope(Dispatchers.IO).launch {
             upgradeDataIfLegacy(database)
@@ -70,10 +72,6 @@ abstract class AppDatabase : RoomDatabase() {
         faqDao.insertFaqs(initialFaqs)
       }
 
-      val callDao = database.callDao()
-      if (callDao.getCallCount() == 0) {
-        callDao.insertCalls(com.example.integrations.SupabaseCallFetcher.getSampleSupabaseCallLogs())
-      }
     }
 
     suspend fun upgradeDataIfLegacy(database: AppDatabase) {
@@ -87,10 +85,6 @@ abstract class AppDatabase : RoomDatabase() {
         faqDao.insertFaqs(initialFaqs)
       }
 
-      val callDao = database.callDao()
-      if (callDao.getCallCount() == 0) {
-        callDao.insertCalls(com.example.integrations.SupabaseCallFetcher.getSampleSupabaseCallLogs())
-      }
     }
 
     suspend fun forceSyncOfficialProducts(database: AppDatabase) {
@@ -119,14 +113,14 @@ abstract class AppDatabase : RoomDatabase() {
       ProductEntity(
         id = 2,
         name = "AI Opportunity Report™",
-        price = 0.0,
+        price = 297.0,
         category = "Business AI Strategy",
         description = "Turn scattered AI possibilities into a prioritized list of the opportunities most likely to create measurable business value.",
         inStock = true,
         popularBadge = "Core Diagnosis",
-        surfLevel = "Stage: Diagnose (Free Tier)",
+        surfLevel = "Stage: Diagnose (\$297)",
         ctaText = "Explore Opportunities",
-        directUrl = "https://otdaisurfer.surf/members/products/ai-opportunity-report",
+        directUrl = "https://buy.stripe.com/14A4gz2pt0WSfPs1tt4gg0f",
         slug = "ai-opportunity-report"
       ),
       ProductEntity(
@@ -197,12 +191,12 @@ abstract class AppDatabase : RoomDatabase() {
       ProductEntity(
         id = 8,
         name = "AEO Blueprint™",
-        price = 1997.0,
+        price = 497.0,
         category = "AI Search Strategy",
         description = "Build a practical roadmap for becoming more visible, understandable, and authoritative across AI-powered search engines (ChatGPT, Perplexity, Gemini, Claude).",
         inStock = true,
         popularBadge = "Answer Engine SEO",
-        surfLevel = "Stage: Plan (Wave Builder)",
+        surfLevel = "Stage: Plan (\$497)",
         ctaText = "Build the Blueprint",
         directUrl = "https://otdaisurfer.surf/members/products/aeo-blueprint",
         slug = "aeo-blueprint"

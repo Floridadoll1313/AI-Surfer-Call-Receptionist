@@ -104,34 +104,18 @@ class CallStateReceiver : BroadcastReceiver() {
           val resolvedName = callerNameOverride?.takeIf { it.isNotBlank() } ?: "Cell Phone Caller"
           val now = System.currentTimeMillis()
 
-          // Avoid duplicate RINGING broadcasts fired back-to-back by Android telephony without a new number
-          val lastNumber = prefs.getString(KEY_ACTIVE_NUMBER, null)
-          val lastRing = prefs.getLong(KEY_RING_TIME, 0L)
-          if (incomingNumber.isBlank() && lastNumber != null && (now - lastRing) < 2_500L) {
-            return null
+          val tracking = prefs.getBoolean(KEY_WAS_RINGING, false)
+          val editor = prefs.edit()
+          if (!tracking) {
+            editor.putLong(KEY_RING_TIME, now)
+              .putLong(KEY_OFFHOOK_TIME, 0L)
+              .putBoolean(KEY_WAS_RINGING, true)
           }
-
-          prefs.edit()
-            .putString(KEY_ACTIVE_NUMBER, resolvedNumber)
-            .putString(KEY_ACTIVE_NAME, resolvedName)
-            .putLong(KEY_RING_TIME, now)
-            .putLong(KEY_OFFHOOK_TIME, 0L)
-            .putBoolean(KEY_WAS_RINGING, true)
-            .commit()
-
-          val questionOrTranscript = transcriptOverride?.takeIf { it.isNotBlank() }
-            ?: "Incoming phone call detected from $resolvedNumber. Summarize intent, action items, and triage urgency."
-
-          return summarizeWithGeminiAndSaveToSupabase(
-            context = context,
-            repository = repository,
-            callerName = resolvedName,
-            callerNumber = resolvedNumber,
-            questionOrTranscript = questionOrTranscript,
-            durationSeconds = 0,
-            geminiSummarizer = geminiSummarizer,
-            supabaseSaver = supabaseSaver
-          )
+          if (!tracking || incomingNumber.isNotBlank()) editor.putString(KEY_ACTIVE_NUMBER, resolvedNumber)
+          if (!tracking || !callerNameOverride.isNullOrBlank()) editor.putString(KEY_ACTIVE_NAME, resolvedName)
+          if (!transcriptOverride.isNullOrBlank()) editor.putString("pending_transcript", transcriptOverride)
+          editor.commit()
+          return null
         }
 
         TelephonyManager.EXTRA_STATE_OFFHOOK -> {
@@ -150,7 +134,11 @@ class CallStateReceiver : BroadcastReceiver() {
           val offhookMs = prefs.getLong(KEY_OFFHOOK_TIME, 0L)
           val ringMs = prefs.getLong(KEY_RING_TIME, 0L)
 
+          val pendingTranscript = prefs.getString("pending_transcript", null)
           prefs.edit()
+            .remove("pending_transcript")
+            .remove(KEY_ACTIVE_NUMBER)
+            .remove(KEY_ACTIVE_NAME)
             .remove(KEY_WAS_RINGING)
             .remove(KEY_OFFHOOK_TIME)
             .commit()
@@ -164,9 +152,8 @@ class CallStateReceiver : BroadcastReceiver() {
             ((endMs - ringMs) / 1000L).toInt().coerceAtLeast(0)
           }
 
-          if (durationSec < 2 && transcriptOverride.isNullOrBlank()) return null
 
-          val completedNotes = transcriptOverride?.takeIf { it.isNotBlank() }
+          val completedNotes = transcriptOverride?.takeIf { it.isNotBlank() } ?: pendingTranscript
             ?: "Completed incoming call with $activeNumber (duration ${durationSec}s). Generate final post-call Gemini Flash summary."
 
           return summarizeWithGeminiAndSaveToSupabase(
