@@ -24,6 +24,9 @@ import com.example.integrations.SupabaseConfig
 import com.example.integrations.SupabaseConnectionState
 import com.example.integrations.SupabaseWaveAuditLeadDto
 import com.example.integrations.WaveAuditLead
+import com.example.ui.components.CallDateFilter
+import com.example.ui.components.CallStatusFilter
+import com.example.ui.theme.OceanPalette
 import com.example.voice.VoiceReceptionistController
 import com.example.voice.VoiceUiState
 import kotlinx.coroutines.Job
@@ -60,6 +63,9 @@ class OceanSurferViewModel(
   val calls: StateFlow<List<CallEntity>> = repository.allCalls
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+  val latestCalls: StateFlow<List<CallEntity>> = repository.latestCalls
+    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
   val pendingCalls: StateFlow<List<CallEntity>> = repository.pendingCalls
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -72,7 +78,7 @@ class OceanSurferViewModel(
   private val _activeCall = MutableStateFlow(ActiveCallUiState())
   val activeCall: StateFlow<ActiveCallUiState> = _activeCall.asStateFlow()
 
-  private val _chatGptConfig = MutableStateFlow(ChatGptConfig())
+  private val _chatGptConfig = MutableStateFlow(IntegrationPrefsStore.loadChatGptConfig(appContext))
   val chatGptConfig: StateFlow<ChatGptConfig> = _chatGptConfig.asStateFlow()
 
   private val _supabaseConfig = MutableStateFlow(IntegrationPrefsStore.loadSupabaseConfig(appContext))
@@ -99,14 +105,33 @@ class OceanSurferViewModel(
   private val _pendingEmailEscalation = MutableStateFlow<CallEntity?>(null)
   val pendingEmailEscalation: StateFlow<CallEntity?> = _pendingEmailEscalation.asStateFlow()
 
-  private val _selectedStatusFilter = MutableStateFlow(com.example.ui.components.CallStatusFilter.ALL)
-  val selectedStatusFilter: StateFlow<com.example.ui.components.CallStatusFilter> = _selectedStatusFilter.asStateFlow()
+  private val _selectedStatusFilter = MutableStateFlow(CallStatusFilter.ALL)
+  val selectedStatusFilter: StateFlow<CallStatusFilter> = _selectedStatusFilter.asStateFlow()
+
+  private val _callSearchQuery = MutableStateFlow("")
+  val callSearchQuery: StateFlow<String> = _callSearchQuery.asStateFlow()
+
+  private val _selectedDateFilter = MutableStateFlow(CallDateFilter.ALL)
+  val selectedDateFilter: StateFlow<CallDateFilter> = _selectedDateFilter.asStateFlow()
+
+  private val _customDateRange = MutableStateFlow<Pair<Long?, Long?>>(null to null)
+  val customDateRange: StateFlow<Pair<Long?, Long?>> = _customDateRange.asStateFlow()
 
   private val _supabaseConnectionState = MutableStateFlow<SupabaseConnectionState>(SupabaseConnectionState.Idle)
   val supabaseConnectionState: StateFlow<SupabaseConnectionState> = _supabaseConnectionState.asStateFlow()
 
   private val _geminiAdvisorState = MutableStateFlow<GeminiAdvisorUiState>(GeminiAdvisorUiState.Idle)
   val geminiAdvisorState: StateFlow<GeminiAdvisorUiState> = _geminiAdvisorState.asStateFlow()
+
+  private val _selectedPalette = MutableStateFlow(IntegrationPrefsStore.loadOceanPalette(appContext))
+  val selectedPalette: StateFlow<OceanPalette> = _selectedPalette.asStateFlow()
+
+  fun selectOceanPalette(palette: OceanPalette) {
+    if (_selectedPalette.value == palette) return
+    _selectedPalette.value = palette
+    IntegrationPrefsStore.saveOceanPalette(appContext, palette)
+    _snackbarMessage.value = "Ocean theme switched to ${palette.displayName}!"
+  }
 
   val unsyncedCallCount: StateFlow<Int> = repository.allCalls
     .map { list -> list.count { !it.supabaseSynced } }
@@ -141,6 +166,14 @@ class OceanSurferViewModel(
     voiceController.startListening()
   }
 
+  fun startConsoleVoiceInput(onCaptured: (String) -> Unit) {
+    voiceController.startListening(onCaptured)
+  }
+
+  fun speakText(text: String) {
+    voiceController.speakReply(text)
+  }
+
   fun stopVoiceListening() {
     voiceController.stopListening()
   }
@@ -154,8 +187,27 @@ class OceanSurferViewModel(
     voiceController.release()
   }
 
-  fun setStatusFilter(filter: com.example.ui.components.CallStatusFilter) {
+  fun setStatusFilter(filter: CallStatusFilter) {
     _selectedStatusFilter.value = filter
+  }
+
+  fun setCallSearchQuery(query: String) {
+    _callSearchQuery.value = query
+  }
+
+  fun setDateFilter(filter: CallDateFilter) {
+    _selectedDateFilter.value = filter
+  }
+
+  fun setCustomDateRange(startUtcMillis: Long?, endUtcMillis: Long?) {
+    _customDateRange.value = startUtcMillis to endUtcMillis
+  }
+
+  fun clearCallFilters() {
+    _callSearchQuery.value = ""
+    _selectedDateFilter.value = CallDateFilter.ALL
+    _customDateRange.value = null to null
+    _selectedStatusFilter.value = CallStatusFilter.ALL
   }
 
   fun dismissCallAlert() {
@@ -339,7 +391,8 @@ class OceanSurferViewModel(
         faqs = faqs.value,
         openAiApiKey = _chatGptConfig.value.apiKey,
         modelName = _chatGptConfig.value.model,
-        returningContext = returningPrompt
+        returningContext = returningPrompt,
+        useOpenAi = _chatGptConfig.value.isEnabled
       )
 
       val shouldEscalate = result.requiresImmediateEscalation ||
@@ -378,7 +431,8 @@ class OceanSurferViewModel(
           faqs = faqs.value,
           openAiApiKey = _chatGptConfig.value.apiKey,
           modelName = _chatGptConfig.value.model,
-          returningContext = returningPrompt
+          returningContext = returningPrompt,
+          useOpenAi = _chatGptConfig.value.isEnabled
         )
 
         val cfg = _escalationTriggerConfig.value
@@ -537,7 +591,8 @@ class OceanSurferViewModel(
         products = products.value,
         faqs = faqs.value,
         openAiApiKey = _chatGptConfig.value.apiKey,
-        modelName = _chatGptConfig.value.model
+        modelName = _chatGptConfig.value.model,
+        useOpenAi = _chatGptConfig.value.isEnabled
       )
 
       val callEntity = CallEntity(
@@ -590,12 +645,41 @@ class OceanSurferViewModel(
 
   // --- Integrations: ChatGPT, Supabase, GitHub ---
 
-  fun updateChatGptConfig(apiKey: String, model: String) {
-    _chatGptConfig.value = _chatGptConfig.value.copy(
-      apiKey = apiKey,
-      model = model
+  fun updateChatGptConfig(apiKey: String, model: String, isEnabled: Boolean = _chatGptConfig.value.isEnabled || apiKey.isNotBlank()) {
+    val cleanKey = apiKey.trim()
+    val updated = _chatGptConfig.value.copy(
+      apiKey = cleanKey,
+      model = model,
+      isEnabled = isEnabled
     )
-    _snackbarMessage.value = "ChatGPT settings updated."
+    _chatGptConfig.value = updated
+    IntegrationPrefsStore.saveChatGptConfig(appContext, updated)
+    _snackbarMessage.value = if (updated.isEnabled) {
+      "OpenAI ChatGPT settings updated ($model)."
+    } else {
+      "OpenAI key disabled — using Gemini / built-in AI."
+    }
+  }
+
+  fun setOpenAiEnabled(enabled: Boolean) {
+    val updated = _chatGptConfig.value.copy(isEnabled = enabled)
+    _chatGptConfig.value = updated
+    IntegrationPrefsStore.saveChatGptConfig(appContext, updated)
+    _snackbarMessage.value = if (enabled) {
+      "OpenAI ChatGPT enabled."
+    } else {
+      "OpenAI key released — using Gemini / built-in AI."
+    }
+  }
+
+  fun clearOpenAiKey() {
+    val updated = _chatGptConfig.value.copy(
+      apiKey = "",
+      isEnabled = false
+    )
+    _chatGptConfig.value = updated
+    IntegrationPrefsStore.saveChatGptConfig(appContext, updated)
+    _snackbarMessage.value = "OpenAI key cleared & disconnected. Using Gemini / built-in AI."
   }
 
   fun updateSupabaseConfig(projectUrl: String, anonKey: String) {
@@ -622,32 +706,44 @@ class OceanSurferViewModel(
   }
 
   fun fetchCallsFromSupabase() {
+    if (_isFetchingFromSupabase.value) return
     viewModelScope.launch {
       _isFetchingFromSupabase.value = true
-      val liveResult = SupabaseClient.fetchCalls(_supabaseConfig.value)
-      val timeFormat = java.text.SimpleDateFormat("h:mm a", java.util.Locale.getDefault())
-      if (liveResult.isSuccess && liveResult.getOrNull()?.isNotEmpty() == true) {
-        val remoteCalls = liveResult.getOrThrow()
-        val reconciled = repository.reconcileRemoteCalls(remoteCalls)
-        _supabaseConnectionState.value = SupabaseConnectionState.Connected(
-          latencyMs = 0L,
-          message = "Synced ${remoteCalls.size} live rows ($reconciled updated) from Supabase public.calls"
-        )
-        _lastSupabaseFetchTime.value = "Live Supabase sync at ${timeFormat.format(java.util.Date())}"
-        _snackbarMessage.value = "Fetched ${remoteCalls.size} live records from Supabase!"
-      } else {
-        val sampleCalls = com.example.integrations.SupabaseCallFetcher.getSampleSupabaseCallLogs()
-        repository.insertCalls(sampleCalls)
-        _lastSupabaseFetchTime.value = "Snapshot synced at ${timeFormat.format(java.util.Date())}"
-        val err = liveResult.exceptionOrNull()?.localizedMessage
-        if (err != null) {
-          _supabaseConnectionState.value = SupabaseConnectionState.Error("Remote fetch note: $err (loaded local snapshot)")
-          _snackbarMessage.value = "Loaded ${sampleCalls.size} Ocean Surfer snapshot calls ($err)"
-        } else {
-          _snackbarMessage.value = "Loaded ${sampleCalls.size} call records from Supabase snapshot!"
+      try {
+        val cfg = _supabaseConfig.value
+        var pushedCount = 0
+        val unsynced = repository.getUnsyncedCalls()
+        for (call in unsynced) {
+          if (SupabaseClient.syncCallRecord(cfg, call).isSuccess) {
+            repository.markSupabaseSynced(call.id)
+            pushedCount++
+          }
         }
+
+        val liveResult = SupabaseClient.fetchCalls(cfg)
+        val timeFormat = java.text.SimpleDateFormat("h:mm a", java.util.Locale.getDefault())
+        val syncedAt = timeFormat.format(java.util.Date())
+        if (liveResult.isSuccess) {
+          val remoteCalls = liveResult.getOrNull().orEmpty()
+          val reconciled = repository.reconcileRemoteCalls(remoteCalls)
+          _supabaseConnectionState.value = SupabaseConnectionState.Connected(
+            latencyMs = 0L,
+            message = "Synced ${remoteCalls.size} live rows ($reconciled updated, $pushedCount uploaded) from Supabase public.calls"
+          )
+          _lastSupabaseFetchTime.value = "Live Supabase sync at $syncedAt"
+          _snackbarMessage.value = if (remoteCalls.isNotEmpty()) {
+            "Synced ${remoteCalls.size} call logs from Supabase!"
+          } else {
+            "Synced with Supabase ($pushedCount uploaded, 0 remote rows)."
+          }
+        } else {
+          val err = liveResult.exceptionOrNull()?.localizedMessage ?: "Endpoint unreachable"
+          _supabaseConnectionState.value = SupabaseConnectionState.Error("Supabase sync failed: $err")
+          _snackbarMessage.value = "Supabase sync failed: $err"
+        }
+      } finally {
+        _isFetchingFromSupabase.value = false
       }
-      _isFetchingFromSupabase.value = false
     }
   }
 

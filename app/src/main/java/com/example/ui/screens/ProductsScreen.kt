@@ -65,17 +65,7 @@ import com.example.data.local.FaqEntity
 import com.example.data.local.ProductEntity
 import com.example.ui.OceanSurferViewModel
 import com.example.ui.components.OceanWaveHeader
-import com.example.ui.theme.GoldenSun
-import com.example.ui.theme.OceanAbyss
-import com.example.ui.theme.OceanCard
-import com.example.ui.theme.OceanCardSecondary
-import com.example.ui.theme.OceanDeepBlue
-import com.example.ui.theme.SandTextPrimary
-import com.example.ui.theme.SandTextSecondary
-import com.example.ui.theme.SeaGreen
-import com.example.ui.theme.SurfCyan
-import com.example.ui.theme.SurfTeal
-import com.example.ui.theme.SurfTurquoise
+import com.example.ui.theme.OceanTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -84,6 +74,7 @@ fun ProductsScreen(
   modifier: Modifier = Modifier
 ) {
   val context = LocalContext.current
+  val colors = OceanTheme.colors
   val products by viewModel.products.collectAsStateWithLifecycle()
   val faqs by viewModel.faqs.collectAsStateWithLifecycle()
 
@@ -106,7 +97,7 @@ fun ProductsScreen(
   Box(
     modifier = modifier
       .fillMaxSize()
-      .background(OceanAbyss)
+      .background(colors.abyss)
   ) {
     Column(modifier = Modifier.fillMaxSize()) {
       OceanWaveHeader(
@@ -116,12 +107,12 @@ fun ProductsScreen(
 
       SecondaryTabRow(
         selectedTabIndex = selectedTab,
-        containerColor = OceanDeepBlue,
-        contentColor = SurfTurquoise,
+        containerColor = colors.deepBlue,
+        contentColor = colors.turquoise,
         indicator = {
           TabRowDefaults.SecondaryIndicator(
             modifier = Modifier.tabIndicatorOffset(selectedTab),
-            color = SurfTurquoise
+            color = colors.turquoise
           )
         }
       ) {
@@ -129,15 +120,15 @@ fun ProductsScreen(
           selected = selectedTab == 0,
           onClick = { selectedTab = 0 },
           text = { Text("AI Solutions (${products.size})", fontWeight = FontWeight.Bold, fontSize = 12.sp) },
-          selectedContentColor = SurfTurquoise,
-          unselectedContentColor = SandTextSecondary
+          selectedContentColor = colors.turquoise,
+          unselectedContentColor = colors.textSecondary
         )
         Tab(
           selected = selectedTab == 1,
           onClick = { selectedTab = 1 },
           text = { Text("Business Q&A (${faqs.size})", fontWeight = FontWeight.Bold, fontSize = 12.sp) },
-          selectedContentColor = SurfTurquoise,
-          unselectedContentColor = SandTextSecondary
+          selectedContentColor = colors.turquoise,
+          unselectedContentColor = colors.textSecondary
         )
       }
 
@@ -152,8 +143,8 @@ fun ProductsScreen(
             Card(
               modifier = Modifier.fillMaxWidth(),
               shape = RoundedCornerShape(14.dp),
-              colors = CardDefaults.cardColors(containerColor = OceanDeepBlue),
-              border = androidx.compose.foundation.BorderStroke(1.dp, SurfTurquoise.copy(alpha = 0.5f))
+              colors = CardDefaults.cardColors(containerColor = colors.deepBlue),
+              border = androidx.compose.foundation.BorderStroke(1.dp, colors.turquoise.copy(alpha = 0.5f))
             ) {
               Column(modifier = Modifier.padding(14.dp)) {
                 Row(
@@ -162,24 +153,24 @@ fun ProductsScreen(
                 ) {
                   Surface(
                     shape = CircleShape,
-                    color = SurfCyan.copy(alpha = 0.2f),
+                    color = colors.cyan.copy(alpha = 0.2f),
                     modifier = Modifier.size(36.dp)
                   ) {
                     Box(contentAlignment = Alignment.Center) {
-                      Icon(imageVector = Icons.Default.Language, contentDescription = null, tint = SurfCyan, modifier = Modifier.size(20.dp))
+                      Icon(imageVector = Icons.Default.Language, contentDescription = null, tint = colors.cyan, modifier = Modifier.size(20.dp))
                     }
                   }
                   Spacer(modifier = Modifier.width(10.dp))
                   Column(modifier = Modifier.weight(1f)) {
                     Text(
                       text = "Live Catalog: otdaisurfer.surf",
-                      color = SandTextPrimary,
+                      color = colors.textPrimary,
                       fontWeight = FontWeight.Bold,
                       fontSize = 13.sp
                     )
                     Text(
                       text = "AI Receptionist is grounded in our official business solutions",
-                      color = SurfCyan,
+                      color = colors.cyan,
                       fontSize = 11.sp
                     )
                   }
@@ -193,7 +184,7 @@ fun ProductsScreen(
                 ) {
                   Button(
                     onClick = { viewModel.syncProductsFromWebsite() },
-                    colors = ButtonDefaults.buttonColors(containerColor = SurfTeal),
+                    colors = ButtonDefaults.buttonColors(containerColor = colors.teal),
                     shape = RoundedCornerShape(8.dp),
                     modifier = Modifier.weight(1f)
                   ) {
@@ -207,13 +198,13 @@ fun ProductsScreen(
                       val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://otdaisurfer.surf"))
                       try { context.startActivity(intent) } catch (e: Exception) {}
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = OceanCardSecondary),
+                    colors = ButtonDefaults.buttonColors(containerColor = colors.cardSecondary),
                     shape = RoundedCornerShape(8.dp),
                     modifier = Modifier.weight(1f)
                   ) {
-                    Icon(imageVector = Icons.Default.OpenInBrowser, contentDescription = null, modifier = Modifier.size(14.dp), tint = SurfTurquoise)
+                    Icon(imageVector = Icons.Default.OpenInBrowser, contentDescription = null, modifier = Modifier.size(14.dp), tint = colors.turquoise)
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Visit Website", color = SurfTurquoise, fontSize = 11.sp)
+                    Text("Visit Website", color = colors.turquoise, fontSize = 11.sp)
                   }
                 }
               }
@@ -274,8 +265,8 @@ fun ProductsScreen(
       onClick = {
         if (selectedTab == 0) showAddProductDialog = true else showAddFaqDialog = true
       },
-      containerColor = SurfTurquoise,
-      contentColor = OceanAbyss,
+      containerColor = colors.turquoise,
+      contentColor = colors.abyss,
       modifier = Modifier
         .align(Alignment.BottomEnd)
         .padding(20.dp)
@@ -289,8 +280,8 @@ fun ProductsScreen(
   if (showAddProductDialog) {
     AlertDialog(
       onDismissRequest = { showAddProductDialog = false },
-      containerColor = OceanDeepBlue,
-      title = { Text("Add Surf Product / Service", color = SandTextPrimary, fontWeight = FontWeight.Bold) },
+      containerColor = colors.deepBlue,
+      title = { Text("Add Surf Product / Service", color = colors.textPrimary, fontWeight = FontWeight.Bold) },
       text = {
         Column {
           OutlinedTextField(
@@ -301,10 +292,10 @@ fun ProductsScreen(
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             colors = OutlinedTextFieldDefaults.colors(
-              focusedBorderColor = SurfTurquoise,
-              unfocusedBorderColor = SurfTeal,
-              focusedTextColor = SandTextPrimary,
-              unfocusedTextColor = SandTextPrimary
+              focusedBorderColor = colors.turquoise,
+              unfocusedBorderColor = colors.teal,
+              focusedTextColor = colors.textPrimary,
+              unfocusedTextColor = colors.textPrimary
             )
           )
           Spacer(modifier = Modifier.height(6.dp))
@@ -317,10 +308,10 @@ fun ProductsScreen(
               modifier = Modifier.weight(1f),
               singleLine = true,
               colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = SurfTurquoise,
-                unfocusedBorderColor = SurfTeal,
-                focusedTextColor = SandTextPrimary,
-                unfocusedTextColor = SandTextPrimary
+                focusedBorderColor = colors.turquoise,
+                unfocusedBorderColor = colors.teal,
+                focusedTextColor = colors.textPrimary,
+                unfocusedTextColor = colors.textPrimary
               )
             )
             OutlinedTextField(
@@ -330,10 +321,10 @@ fun ProductsScreen(
               modifier = Modifier.weight(1f),
               singleLine = true,
               colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = SurfTurquoise,
-                unfocusedBorderColor = SurfTeal,
-                focusedTextColor = SandTextPrimary,
-                unfocusedTextColor = SandTextPrimary
+                focusedBorderColor = colors.turquoise,
+                unfocusedBorderColor = colors.teal,
+                focusedTextColor = colors.textPrimary,
+                unfocusedTextColor = colors.textPrimary
               )
             )
           }
@@ -345,10 +336,10 @@ fun ProductsScreen(
             placeholder = { Text("Explain features, specs, and benefits for the AI...") },
             modifier = Modifier.fillMaxWidth(),
             colors = OutlinedTextFieldDefaults.colors(
-              focusedBorderColor = SurfTurquoise,
-              unfocusedBorderColor = SurfTeal,
-              focusedTextColor = SandTextPrimary,
-              unfocusedTextColor = SandTextPrimary
+              focusedBorderColor = colors.turquoise,
+              unfocusedBorderColor = colors.teal,
+              focusedTextColor = colors.textPrimary,
+              unfocusedTextColor = colors.textPrimary
             )
           )
         }
@@ -363,14 +354,14 @@ fun ProductsScreen(
             newDesc = ""
             showAddProductDialog = false
           },
-          colors = ButtonDefaults.buttonColors(containerColor = SurfTurquoise)
+          colors = ButtonDefaults.buttonColors(containerColor = colors.turquoise)
         ) {
-          Text("Add to AI Catalog", color = OceanAbyss, fontWeight = FontWeight.Bold)
+          Text("Add to AI Catalog", color = colors.abyss, fontWeight = FontWeight.Bold)
         }
       },
       dismissButton = {
         TextButton(onClick = { showAddProductDialog = false }) {
-          Text("Cancel", color = SandTextSecondary)
+          Text("Cancel", color = colors.textSecondary)
         }
       }
     )
@@ -380,8 +371,8 @@ fun ProductsScreen(
   if (showAddFaqDialog) {
     AlertDialog(
       onDismissRequest = { showAddFaqDialog = false },
-      containerColor = OceanDeepBlue,
-      title = { Text("Add Business Q&A", color = SandTextPrimary, fontWeight = FontWeight.Bold) },
+      containerColor = colors.deepBlue,
+      title = { Text("Add Business Q&A", color = colors.textPrimary, fontWeight = FontWeight.Bold) },
       text = {
         Column {
           OutlinedTextField(
@@ -392,10 +383,10 @@ fun ProductsScreen(
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             colors = OutlinedTextFieldDefaults.colors(
-              focusedBorderColor = SurfTurquoise,
-              unfocusedBorderColor = SurfTeal,
-              focusedTextColor = SandTextPrimary,
-              unfocusedTextColor = SandTextPrimary
+              focusedBorderColor = colors.turquoise,
+              unfocusedBorderColor = colors.teal,
+              focusedTextColor = colors.textPrimary,
+              unfocusedTextColor = colors.textPrimary
             )
           )
           Spacer(modifier = Modifier.height(6.dp))
@@ -406,10 +397,10 @@ fun ProductsScreen(
             placeholder = { Text("What question will callers ask?") },
             modifier = Modifier.fillMaxWidth(),
             colors = OutlinedTextFieldDefaults.colors(
-              focusedBorderColor = SurfTurquoise,
-              unfocusedBorderColor = SurfTeal,
-              focusedTextColor = SandTextPrimary,
-              unfocusedTextColor = SandTextPrimary
+              focusedBorderColor = colors.turquoise,
+              unfocusedBorderColor = colors.teal,
+              focusedTextColor = colors.textPrimary,
+              unfocusedTextColor = colors.textPrimary
             )
           )
           Spacer(modifier = Modifier.height(6.dp))
@@ -420,10 +411,10 @@ fun ProductsScreen(
             placeholder = { Text("What should the AI receptionist answer?") },
             modifier = Modifier.fillMaxWidth(),
             colors = OutlinedTextFieldDefaults.colors(
-              focusedBorderColor = SurfTurquoise,
-              unfocusedBorderColor = SurfTeal,
-              focusedTextColor = SandTextPrimary,
-              unfocusedTextColor = SandTextPrimary
+              focusedBorderColor = colors.turquoise,
+              unfocusedBorderColor = colors.teal,
+              focusedTextColor = colors.textPrimary,
+              unfocusedTextColor = colors.textPrimary
             )
           )
         }
@@ -437,14 +428,14 @@ fun ProductsScreen(
             newFaqA = ""
             showAddFaqDialog = false
           },
-          colors = ButtonDefaults.buttonColors(containerColor = SurfTurquoise)
+          colors = ButtonDefaults.buttonColors(containerColor = colors.turquoise)
         ) {
-          Text("Save to AI Knowledge", color = OceanAbyss, fontWeight = FontWeight.Bold)
+          Text("Save to AI Knowledge", color = colors.abyss, fontWeight = FontWeight.Bold)
         }
       },
       dismissButton = {
         TextButton(onClick = { showAddFaqDialog = false }) {
-          Text("Cancel", color = SandTextSecondary)
+          Text("Cancel", color = colors.textSecondary)
         }
       }
     )
@@ -457,13 +448,14 @@ fun ProductItemCard(
   onAskAi: () -> Unit,
   onOpenLink: (String) -> Unit
 ) {
+  val colors = OceanTheme.colors
   Card(
     modifier = Modifier
       .fillMaxWidth()
       .testTag("product_item_${product.id}"),
     shape = RoundedCornerShape(16.dp),
-    colors = CardDefaults.cardColors(containerColor = OceanDeepBlue),
-    border = androidx.compose.foundation.BorderStroke(1.dp, SurfTeal.copy(alpha = 0.4f))
+    colors = CardDefaults.cardColors(containerColor = colors.deepBlue),
+    border = androidx.compose.foundation.BorderStroke(1.dp, colors.teal.copy(alpha = 0.4f))
   ) {
     Column(modifier = Modifier.padding(14.dp)) {
       Row(
@@ -475,12 +467,12 @@ fun ProductItemCard(
           if (product.popularBadge.isNotBlank()) {
             Surface(
               shape = RoundedCornerShape(6.dp),
-              color = GoldenSun.copy(alpha = 0.2f),
+              color = colors.goldenSun.copy(alpha = 0.2f),
               modifier = Modifier.padding(bottom = 4.dp)
             ) {
               Text(
                 text = "★ ${product.popularBadge}",
-                color = GoldenSun,
+                color = colors.goldenSun,
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -489,26 +481,26 @@ fun ProductItemCard(
           }
           Text(
             text = product.name,
-            color = SandTextPrimary,
+            color = colors.textPrimary,
             fontWeight = FontWeight.Bold,
             fontSize = 15.sp
           )
           Text(
             text = "${product.category} • ${product.surfLevel}",
-            color = SurfCyan,
+            color = colors.cyan,
             fontSize = 11.sp
           )
         }
 
         Surface(
           shape = RoundedCornerShape(10.dp),
-          color = OceanCard,
-          border = androidx.compose.foundation.BorderStroke(1.dp, SurfTurquoise.copy(alpha = 0.5f))
+          color = colors.card,
+          border = androidx.compose.foundation.BorderStroke(1.dp, colors.turquoise.copy(alpha = 0.5f))
         ) {
           val priceText = if (product.price == 0.0) "FREE" else "$${"%.0f".format(product.price)}"
           Text(
             text = priceText,
-            color = if (product.price == 0.0) SeaGreen else SurfTurquoise,
+            color = if (product.price == 0.0) colors.seaGreen else colors.turquoise,
             fontWeight = FontWeight.ExtraBold,
             fontSize = 15.sp,
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
@@ -520,7 +512,7 @@ fun ProductItemCard(
 
       Text(
         text = product.description,
-        color = SandTextSecondary,
+        color = colors.textSecondary,
         fontSize = 12.sp,
         lineHeight = 16.sp
       )
@@ -533,20 +525,20 @@ fun ProductItemCard(
       ) {
         Button(
           onClick = onAskAi,
-          colors = ButtonDefaults.buttonColors(containerColor = OceanCardSecondary),
+          colors = ButtonDefaults.buttonColors(containerColor = colors.cardSecondary),
           shape = RoundedCornerShape(8.dp),
           contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 6.dp),
           modifier = Modifier.weight(1.1f)
         ) {
-          Icon(imageVector = Icons.Default.Surfing, contentDescription = null, tint = SurfCyan, modifier = Modifier.size(15.dp))
+          Icon(imageVector = Icons.Default.Surfing, contentDescription = null, tint = colors.cyan, modifier = Modifier.size(15.dp))
           Spacer(modifier = Modifier.width(4.dp))
-          Text("Test AI on Product", color = SurfCyan, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+          Text("Test AI on Product", color = colors.cyan, fontSize = 11.sp, fontWeight = FontWeight.Bold)
         }
 
         if (product.directUrl.isNotBlank()) {
           Button(
             onClick = { onOpenLink(product.directUrl) },
-            colors = ButtonDefaults.buttonColors(containerColor = SurfTeal),
+            colors = ButtonDefaults.buttonColors(containerColor = colors.teal),
             shape = RoundedCornerShape(8.dp),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 6.dp),
             modifier = Modifier.weight(0.9f)
@@ -573,21 +565,22 @@ fun FaqItemCard(
   faq: FaqEntity,
   onAskAi: () -> Unit
 ) {
+  val colors = OceanTheme.colors
   Card(
     modifier = Modifier.fillMaxWidth(),
     shape = RoundedCornerShape(16.dp),
-    colors = CardDefaults.cardColors(containerColor = OceanDeepBlue),
-    border = androidx.compose.foundation.BorderStroke(1.dp, SurfTeal.copy(alpha = 0.4f))
+    colors = CardDefaults.cardColors(containerColor = colors.deepBlue),
+    border = androidx.compose.foundation.BorderStroke(1.dp, colors.teal.copy(alpha = 0.4f))
   ) {
     Column(modifier = Modifier.padding(14.dp)) {
       Surface(
         shape = RoundedCornerShape(6.dp),
-        color = SurfCyan.copy(alpha = 0.15f),
+        color = colors.cyan.copy(alpha = 0.15f),
         modifier = Modifier.padding(bottom = 6.dp)
       ) {
         Text(
           text = faq.category.uppercase(),
-          color = SurfCyan,
+          color = colors.cyan,
           fontSize = 10.sp,
           fontWeight = FontWeight.Bold,
           modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -596,7 +589,7 @@ fun FaqItemCard(
 
       Text(
         text = faq.question,
-        color = SandTextPrimary,
+        color = colors.textPrimary,
         fontWeight = FontWeight.Bold,
         fontSize = 14.sp
       )
@@ -605,7 +598,7 @@ fun FaqItemCard(
 
       Text(
         text = faq.answer,
-        color = SandTextSecondary,
+        color = colors.textSecondary,
         fontSize = 12.sp,
         lineHeight = 17.sp
       )
@@ -614,14 +607,14 @@ fun FaqItemCard(
 
       Button(
         onClick = onAskAi,
-        colors = ButtonDefaults.buttonColors(containerColor = OceanCardSecondary),
+        colors = ButtonDefaults.buttonColors(containerColor = colors.cardSecondary),
         shape = RoundedCornerShape(8.dp),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 6.dp),
         modifier = Modifier.fillMaxWidth()
       ) {
-        Icon(imageVector = Icons.Default.QuestionAnswer, contentDescription = null, tint = SurfTurquoise, modifier = Modifier.size(16.dp))
+        Icon(imageVector = Icons.Default.QuestionAnswer, contentDescription = null, tint = colors.turquoise, modifier = Modifier.size(16.dp))
         Spacer(modifier = Modifier.width(6.dp))
-        Text("Simulate Call Inquiring About This", color = SurfTurquoise, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        Text("Simulate Call Inquiring About This", color = colors.turquoise, fontSize = 11.sp, fontWeight = FontWeight.Bold)
       }
     }
   }

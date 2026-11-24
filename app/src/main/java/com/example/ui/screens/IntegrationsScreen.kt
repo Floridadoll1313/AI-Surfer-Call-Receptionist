@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -22,21 +23,28 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.DataObject
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material.icons.filled.OpenInBrowser
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.Waves
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -50,6 +58,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -58,6 +68,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -65,6 +76,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -74,18 +86,8 @@ import com.example.integrations.SupabaseConnectionState
 import com.example.integrations.SupabaseSchemaGenerator
 import com.example.ui.OceanSurferViewModel
 import com.example.ui.components.OceanWaveHeader
-import com.example.ui.theme.CoralAlert
-import com.example.ui.theme.GoldenSun
-import com.example.ui.theme.OceanAbyss
-import com.example.ui.theme.OceanCard
-import com.example.ui.theme.OceanCardSecondary
-import com.example.ui.theme.OceanDeepBlue
-import com.example.ui.theme.SandTextPrimary
-import com.example.ui.theme.SandTextSecondary
-import com.example.ui.theme.SeaGreen
-import com.example.ui.theme.SurfCyan
-import com.example.ui.theme.SurfTeal
-import com.example.ui.theme.SurfTurquoise
+import com.example.ui.theme.OceanPalette
+import com.example.ui.theme.OceanTheme
 
 @Composable
 fun IntegrationsScreen(
@@ -99,6 +101,8 @@ fun IntegrationsScreen(
   val gitHubConfig by viewModel.gitHubConfig.collectAsStateWithLifecycle()
   val context = LocalContext.current
   val scrollState = rememberScrollState()
+  val colors = OceanTheme.colors
+  val themeController = OceanTheme.controller
 
   var apiKeyInput by remember(chatGptConfig.apiKey) { mutableStateOf(chatGptConfig.apiKey) }
   var selectedModel by remember(chatGptConfig.model) { mutableStateOf(chatGptConfig.model) }
@@ -112,15 +116,32 @@ fun IntegrationsScreen(
   val isGeminiReady = remember { GeminiAiService.isFirebaseAvailable(context) }
   val isOpenAiSecretConfigured = remember { OpenAiClient.hasConfiguredBuildConfigKey() }
 
+  fun readClipboardText(): String? {
+    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return null
+    val clip = clipboard.primaryClip ?: return null
+    if (clip.itemCount <= 0) return null
+    return clip.getItemAt(0)?.coerceToText(context)?.toString()?.trim()?.takeIf { it.isNotEmpty() }
+  }
+
+  fun writeClipboardText(label: String, value: String) {
+    if (value.isBlank()) {
+      viewModel.showSnackbar("Nothing to copy yet.")
+      return
+    }
+    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    clipboard.setPrimaryClip(ClipData.newPlainText(label, value))
+    viewModel.showSnackbar("$label copied to clipboard!")
+  }
+
   Column(
     modifier = modifier
       .fillMaxSize()
-      .background(OceanAbyss)
+      .background(colors.abyss)
       .verticalScroll(scrollState)
   ) {
     OceanWaveHeader(
-      title = "AI & Cloud Integrations",
-      subtitle = "Gemini AI Logic • ChatGPT Summaries • Supabase Client • GitHub Pages"
+      title = "Settings & Integrations",
+      subtitle = "Ocean Theme • Gemini AI • ChatGPT • Supabase • GitHub"
     )
 
     Column(
@@ -129,14 +150,21 @@ fun IntegrationsScreen(
         .padding(16.dp),
       verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
+      // 0. Dynamic Ocean Theme Switcher (ThemeProvider)
+      OceanThemeSwitcherCard(
+        activePalette = themeController.currentPalette,
+        onSelectPalette = { palette -> themeController.selectPalette(palette) },
+        onCyclePalette = { themeController.cyclePalette() }
+      )
+
       // 1. Dual AI Engine (Firebase AI Logic Gemini + ChatGPT Call Summaries)
       Card(
         modifier = Modifier
           .fillMaxWidth()
           .testTag("chatgpt_integration_card"),
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = OceanDeepBlue),
-        border = BorderStroke(1.dp, SurfTeal.copy(alpha = 0.5f))
+        colors = CardDefaults.cardColors(containerColor = colors.deepBlue),
+        border = BorderStroke(1.dp, colors.teal.copy(alpha = 0.5f))
       ) {
         Column(modifier = Modifier.padding(16.dp)) {
           Row(
@@ -145,14 +173,14 @@ fun IntegrationsScreen(
           ) {
             Surface(
               shape = CircleShape,
-              color = SeaGreen.copy(alpha = 0.2f),
+              color = colors.seaGreen.copy(alpha = 0.2f),
               modifier = Modifier.size(40.dp)
             ) {
               Box(contentAlignment = Alignment.Center) {
                 Icon(
                   imageVector = Icons.Default.AutoAwesome,
                   contentDescription = null,
-                  tint = SeaGreen,
+                  tint = colors.seaGreen,
                   modifier = Modifier.size(22.dp)
                 )
               }
@@ -163,19 +191,21 @@ fun IntegrationsScreen(
             Column(modifier = Modifier.weight(1f)) {
               Text(
                 text = "AI Capabilities: Gemini & ChatGPT",
-                color = SandTextPrimary,
+                color = colors.textPrimary,
                 fontWeight = FontWeight.Bold,
                 fontSize = 15.sp
               )
+              val hasAnyOpenAiKey = chatGptConfig.apiKey.isNotBlank() || isOpenAiSecretConfigured
+              val isOpenAiActive = chatGptConfig.isEnabled && hasAnyOpenAiKey
               Text(
-                text = if (chatGptConfig.apiKey.isNotBlank() || isOpenAiSecretConfigured) {
+                text = if (isOpenAiActive) {
                   "OpenAI ChatGPT active • Capturing Topic, Actions & Sentiment"
                 } else if (isGeminiReady) {
                   "Firebase AI Logic (gemini-3.8-flash) Active via App Check"
                 } else {
                   "Built-in AI Surfer Summarizer Active"
                 },
-                color = SeaGreen,
+                color = colors.seaGreen,
                 fontSize = 11.sp
               )
             }
@@ -185,29 +215,67 @@ fun IntegrationsScreen(
 
           Surface(
             shape = RoundedCornerShape(10.dp),
-            color = OceanCard,
+            color = colors.card,
             modifier = Modifier.fillMaxWidth()
           ) {
             Column(modifier = Modifier.padding(10.dp)) {
               Text(
                 text = "Call Summarization Format: Main Topic • Action Items • Sentiment",
-                color = SurfTurquoise,
+                color = colors.turquoise,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold
               )
               Text(
-                text = "Gemini 3.8 Flash handles real-time Client Hub streaming & structured call triage when no OpenAI key is set.",
-                color = SandTextSecondary,
+                text = "Gemini 3.8 Flash handles real-time Client Hub streaming & structured call triage when OpenAI is cleared or disabled.",
+                color = colors.textSecondary,
                 fontSize = 11.sp
               )
             }
+          }
+
+          Spacer(modifier = Modifier.height(10.dp))
+
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+          ) {
+            Column(modifier = Modifier.weight(1f)) {
+              Text(
+                text = "Use OpenAI ChatGPT Key",
+                color = colors.textPrimary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold
+              )
+              Text(
+                text = when {
+                  !chatGptConfig.isEnabled -> "Released — using Gemini / built-in AI"
+                  chatGptConfig.apiKey.isNotBlank() -> "Using saved custom OpenAI key"
+                  isOpenAiSecretConfigured -> "Using AI Studio Secrets key (BuildConfig)"
+                  else -> "No key active — add in Secrets or paste below"
+                },
+                color = colors.textSecondary,
+                fontSize = 11.sp
+              )
+            }
+            Switch(
+              checked = chatGptConfig.isEnabled,
+              onCheckedChange = { enabled -> viewModel.setOpenAiEnabled(enabled) },
+              colors = SwitchDefaults.colors(
+                checkedThumbColor = colors.abyss,
+                checkedTrackColor = colors.turquoise,
+                uncheckedThumbColor = colors.textSecondary,
+                uncheckedTrackColor = colors.card
+              ),
+              modifier = Modifier.testTag("openai_enabled_switch")
+            )
           }
 
           Spacer(modifier = Modifier.height(12.dp))
 
           Text(
             text = "OpenAI ChatGPT API Key (Optional override):",
-            color = SandTextSecondary,
+            color = colors.textSecondary,
             fontSize = 12.sp,
             fontWeight = FontWeight.Medium
           )
@@ -217,26 +285,58 @@ fun IntegrationsScreen(
           OutlinedTextField(
             value = apiKeyInput,
             onValueChange = { apiKeyInput = it },
-            placeholder = { Text("sk-proj-...", color = SandTextSecondary.copy(alpha = 0.6f)) },
+            placeholder = { Text("sk-proj-...", color = colors.textSecondary.copy(alpha = 0.6f)) },
             modifier = Modifier
               .fillMaxWidth()
               .testTag("chatgpt_api_key_input"),
             singleLine = true,
             visualTransformation = if (showApiKey) VisualTransformation.None else PasswordVisualTransformation(),
             trailingIcon = {
-              IconButton(onClick = { showApiKey = !showApiKey }) {
-                Icon(
-                  imageVector = if (showApiKey) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                  contentDescription = "Toggle API key visibility",
-                  tint = SurfCyan
-                )
+              Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                  onClick = {
+                    val pasted = readClipboardText()
+                    if (pasted != null) {
+                      apiKeyInput = pasted
+                      viewModel.showSnackbar("OpenAI key pasted from clipboard!")
+                    } else {
+                      viewModel.showSnackbar("Clipboard is empty. Copy your key first, or use AI Studio Secrets.")
+                    }
+                  },
+                  modifier = Modifier.testTag("paste_chatgpt_api_key_button")
+                ) {
+                  Icon(
+                    imageVector = Icons.Default.ContentPaste,
+                    contentDescription = "Paste OpenAI API key",
+                    tint = colors.turquoise
+                  )
+                }
+                if (apiKeyInput.isNotEmpty()) {
+                  IconButton(
+                    onClick = { apiKeyInput = "" },
+                    modifier = Modifier.testTag("clear_chatgpt_key_input_button")
+                  ) {
+                    Icon(
+                      imageVector = Icons.Default.Clear,
+                      contentDescription = "Clear key field",
+                      tint = colors.textSecondary
+                    )
+                  }
+                }
+                IconButton(onClick = { showApiKey = !showApiKey }) {
+                  Icon(
+                    imageVector = if (showApiKey) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                    contentDescription = "Toggle API key visibility",
+                    tint = colors.cyan
+                  )
+                }
               }
             },
             colors = OutlinedTextFieldDefaults.colors(
-              focusedBorderColor = SurfTurquoise,
-              unfocusedBorderColor = SurfTeal,
-              focusedTextColor = SandTextPrimary,
-              unfocusedTextColor = SandTextPrimary
+              focusedBorderColor = colors.turquoise,
+              unfocusedBorderColor = colors.teal,
+              focusedTextColor = colors.textPrimary,
+              unfocusedTextColor = colors.textPrimary
             )
           )
 
@@ -244,7 +344,7 @@ fun IntegrationsScreen(
 
           Text(
             text = "ChatGPT Model Selection:",
-            color = SandTextSecondary,
+            color = colors.textSecondary,
             fontSize = 12.sp,
             fontWeight = FontWeight.Medium
           )
@@ -261,10 +361,10 @@ fun IntegrationsScreen(
                 onClick = { selectedModel = model },
                 label = { Text(model, fontSize = 11.sp) },
                 colors = FilterChipDefaults.filterChipColors(
-                  selectedContainerColor = SurfTurquoise,
-                  selectedLabelColor = OceanAbyss,
-                  containerColor = OceanCard,
-                  labelColor = SandTextPrimary
+                  selectedContainerColor = colors.turquoise,
+                  selectedLabelColor = colors.abyss,
+                  containerColor = colors.card,
+                  labelColor = colors.textPrimary
                 )
               )
             }
@@ -272,19 +372,51 @@ fun IntegrationsScreen(
 
           Spacer(modifier = Modifier.height(12.dp))
 
-          Button(
-            onClick = {
-              viewModel.updateChatGptConfig(apiKeyInput.trim(), selectedModel)
-            },
-            colors = ButtonDefaults.buttonColors(containerColor = SurfTeal),
-            shape = RoundedCornerShape(10.dp),
-            modifier = Modifier
-              .fillMaxWidth()
-              .testTag("save_chatgpt_button")
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
           ) {
-            Icon(imageVector = Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
-            Spacer(modifier = Modifier.width(6.dp))
-            Text("Save AI Settings", color = Color.White, fontWeight = FontWeight.Bold)
+            Button(
+              onClick = {
+                val trimmed = apiKeyInput.trim()
+                if (trimmed.isEmpty()) {
+                  viewModel.clearOpenAiKey()
+                } else {
+                  viewModel.updateChatGptConfig(trimmed, selectedModel, isEnabled = true)
+                }
+              },
+              colors = ButtonDefaults.buttonColors(containerColor = colors.teal),
+              shape = RoundedCornerShape(10.dp),
+              modifier = Modifier
+                .weight(1f)
+                .defaultMinSize(minHeight = 48.dp)
+                .testTag("save_chatgpt_button")
+            ) {
+              Icon(imageVector = Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+              Spacer(modifier = Modifier.width(6.dp))
+              Text("Save AI Settings", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            }
+
+            OutlinedButton(
+              onClick = {
+                apiKeyInput = ""
+                viewModel.clearOpenAiKey()
+              },
+              border = BorderStroke(1.dp, colors.coralAlert.copy(alpha = 0.7f)),
+              shape = RoundedCornerShape(10.dp),
+              modifier = Modifier
+                .defaultMinSize(minHeight = 48.dp)
+                .testTag("clear_chatgpt_key_button")
+            ) {
+              Icon(
+                imageVector = Icons.Default.LinkOff,
+                contentDescription = "Release OpenAI key",
+                tint = colors.coralAlert,
+                modifier = Modifier.size(16.dp)
+              )
+              Spacer(modifier = Modifier.width(4.dp))
+              Text("Release Key", color = colors.coralAlert, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            }
           }
         }
       }
@@ -295,8 +427,8 @@ fun IntegrationsScreen(
           .fillMaxWidth()
           .testTag("supabase_integration_card"),
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = OceanDeepBlue),
-        border = BorderStroke(1.dp, SurfTeal.copy(alpha = 0.5f))
+        colors = CardDefaults.cardColors(containerColor = colors.deepBlue),
+        border = BorderStroke(1.dp, colors.teal.copy(alpha = 0.5f))
       ) {
         Column(modifier = Modifier.padding(16.dp)) {
           Row(
@@ -305,14 +437,14 @@ fun IntegrationsScreen(
           ) {
             Surface(
               shape = CircleShape,
-              color = SurfCyan.copy(alpha = 0.2f),
+              color = colors.cyan.copy(alpha = 0.2f),
               modifier = Modifier.size(40.dp)
             ) {
               Box(contentAlignment = Alignment.Center) {
                 Icon(
                   imageVector = Icons.Default.Storage,
                   contentDescription = null,
-                  tint = SurfCyan,
+                  tint = colors.cyan,
                   modifier = Modifier.size(22.dp)
                 )
               }
@@ -323,13 +455,13 @@ fun IntegrationsScreen(
             Column(modifier = Modifier.weight(1f)) {
               Text(
                 text = "Supabase PostgREST Client & Schema",
-                color = SandTextPrimary,
+                color = colors.textPrimary,
                 fontWeight = FontWeight.Bold,
                 fontSize = 15.sp
               )
               Text(
                 text = "Logs caller_id, timestamp, duration & ChatGPT summary",
-                color = SurfCyan,
+                color = colors.cyan,
                 fontSize = 11.sp
               )
             }
@@ -342,20 +474,20 @@ fun IntegrationsScreen(
             SupabaseConnectionState.Idle -> Unit
             SupabaseConnectionState.Testing -> {
               Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 8.dp)) {
-                CircularProgressIndicator(modifier = Modifier.size(14.dp), color = SurfTurquoise, strokeWidth = 2.dp)
+                CircularProgressIndicator(modifier = Modifier.size(14.dp), color = colors.turquoise, strokeWidth = 2.dp)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Pinging Supabase PostgREST...", color = SurfCyan, fontSize = 11.sp)
+                Text("Pinging Supabase PostgREST...", color = colors.cyan, fontSize = 11.sp)
               }
             }
             is SupabaseConnectionState.Connected -> {
               Surface(
                 shape = RoundedCornerShape(8.dp),
-                color = SeaGreen.copy(alpha = 0.16f),
+                color = colors.seaGreen.copy(alpha = 0.16f),
                 modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
               ) {
                 Text(
                   text = "✓ ${conn.message} (${conn.latencyMs}ms)",
-                  color = SeaGreen,
+                  color = colors.seaGreen,
                   fontSize = 11.sp,
                   fontWeight = FontWeight.SemiBold,
                   modifier = Modifier.padding(8.dp)
@@ -365,12 +497,12 @@ fun IntegrationsScreen(
             is SupabaseConnectionState.Error -> {
               Surface(
                 shape = RoundedCornerShape(8.dp),
-                color = CoralAlert.copy(alpha = 0.14f),
+                color = colors.coralAlert.copy(alpha = 0.14f),
                 modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
               ) {
                 Text(
                   text = conn.message,
-                  color = GoldenSun,
+                  color = colors.goldenSun,
                   fontSize = 11.sp,
                   modifier = Modifier.padding(8.dp)
                 )
@@ -384,11 +516,43 @@ fun IntegrationsScreen(
             label = { Text("Supabase Project URL") },
             modifier = Modifier.fillMaxWidth().testTag("supabase_url_input"),
             singleLine = true,
+            trailingIcon = {
+              Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                  onClick = {
+                    val pasted = readClipboardText()
+                    if (pasted != null) {
+                      supabaseUrlInput = pasted
+                      viewModel.showSnackbar("Supabase URL pasted from clipboard!")
+                    } else {
+                      viewModel.showSnackbar("Clipboard is empty.")
+                    }
+                  },
+                  modifier = Modifier.testTag("paste_supabase_url_button")
+                ) {
+                  Icon(
+                    imageVector = Icons.Default.ContentPaste,
+                    contentDescription = "Paste Supabase URL",
+                    tint = colors.turquoise
+                  )
+                }
+                IconButton(
+                  onClick = { writeClipboardText("Supabase URL", supabaseUrlInput) },
+                  modifier = Modifier.testTag("copy_supabase_url_button")
+                ) {
+                  Icon(
+                    imageVector = Icons.Default.ContentCopy,
+                    contentDescription = "Copy Supabase URL",
+                    tint = colors.cyan
+                  )
+                }
+              }
+            },
             colors = OutlinedTextFieldDefaults.colors(
-              focusedBorderColor = SurfTurquoise,
-              unfocusedBorderColor = SurfTeal,
-              focusedTextColor = SandTextPrimary,
-              unfocusedTextColor = SandTextPrimary
+              focusedBorderColor = colors.turquoise,
+              unfocusedBorderColor = colors.teal,
+              focusedTextColor = colors.textPrimary,
+              unfocusedTextColor = colors.textPrimary
             )
           )
 
@@ -397,24 +561,45 @@ fun IntegrationsScreen(
           OutlinedTextField(
             value = supabaseKeyInput,
             onValueChange = { supabaseKeyInput = it },
-            label = { Text("Supabase Anon Key") },
+            label = { Text("Supabase Publishable / Anon Key") },
+            placeholder = { Text("sb_publishable_...", color = colors.textSecondary.copy(alpha = 0.6f)) },
             modifier = Modifier.fillMaxWidth().testTag("supabase_anon_key_input"),
             singleLine = true,
             visualTransformation = if (showSupabaseKey) VisualTransformation.None else PasswordVisualTransformation(),
             trailingIcon = {
-              IconButton(onClick = { showSupabaseKey = !showSupabaseKey }) {
-                Icon(
-                  imageVector = if (showSupabaseKey) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                  contentDescription = "Toggle Supabase key visibility",
-                  tint = SurfCyan
-                )
+              Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                  onClick = {
+                    val pasted = readClipboardText()
+                    if (pasted != null) {
+                      supabaseKeyInput = pasted
+                      viewModel.showSnackbar("Supabase key pasted from clipboard!")
+                    } else {
+                      viewModel.showSnackbar("Clipboard is empty.")
+                    }
+                  },
+                  modifier = Modifier.testTag("paste_supabase_key_button")
+                ) {
+                  Icon(
+                    imageVector = Icons.Default.ContentPaste,
+                    contentDescription = "Paste Supabase key",
+                    tint = colors.turquoise
+                  )
+                }
+                IconButton(onClick = { showSupabaseKey = !showSupabaseKey }) {
+                  Icon(
+                    imageVector = if (showSupabaseKey) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                    contentDescription = "Toggle Supabase key visibility",
+                    tint = colors.cyan
+                  )
+                }
               }
             },
             colors = OutlinedTextFieldDefaults.colors(
-              focusedBorderColor = SurfTurquoise,
-              unfocusedBorderColor = SurfTeal,
-              focusedTextColor = SandTextPrimary,
-              unfocusedTextColor = SandTextPrimary
+              focusedBorderColor = colors.turquoise,
+              unfocusedBorderColor = colors.teal,
+              focusedTextColor = colors.textPrimary,
+              unfocusedTextColor = colors.textPrimary
             )
           )
 
@@ -429,21 +614,27 @@ fun IntegrationsScreen(
                 viewModel.updateSupabaseConfig(supabaseUrlInput.trim(), supabaseKeyInput.trim())
                 viewModel.testSupabaseConnection()
               },
-              colors = ButtonDefaults.buttonColors(containerColor = OceanCardSecondary),
+              colors = ButtonDefaults.buttonColors(containerColor = colors.cardSecondary),
               shape = RoundedCornerShape(10.dp),
-              modifier = Modifier.weight(1f).testTag("test_supabase_button")
+              modifier = Modifier
+                .weight(1f)
+                .defaultMinSize(minHeight = 48.dp)
+                .testTag("test_supabase_button")
             ) {
-              Icon(imageVector = Icons.Default.CloudDone, contentDescription = null, modifier = Modifier.size(15.dp), tint = SurfTurquoise)
+              Icon(imageVector = Icons.Default.CloudDone, contentDescription = null, modifier = Modifier.size(15.dp), tint = colors.turquoise)
               Spacer(modifier = Modifier.width(4.dp))
-              Text("Save & Ping", color = SurfTurquoise, fontSize = 12.sp)
+              Text("Save & Ping", color = colors.turquoise, fontSize = 12.sp)
             }
 
             Button(
               onClick = { viewModel.fetchCallsFromSupabase() },
               enabled = !isFetchingSupabase,
-              colors = ButtonDefaults.buttonColors(containerColor = SurfTeal),
+              colors = ButtonDefaults.buttonColors(containerColor = colors.teal),
               shape = RoundedCornerShape(10.dp),
-              modifier = Modifier.weight(1f).testTag("sync_supabase_calls_button")
+              modifier = Modifier
+                .weight(1f)
+                .defaultMinSize(minHeight = 48.dp)
+                .testTag("sync_supabase_calls_button")
             ) {
               Icon(imageVector = Icons.Default.CloudSync, contentDescription = null, modifier = Modifier.size(15.dp))
               Spacer(modifier = Modifier.width(4.dp))
@@ -455,13 +646,16 @@ fun IntegrationsScreen(
 
           OutlinedButton(
             onClick = { showSqlSchema = !showSqlSchema },
-            border = BorderStroke(1.dp, SurfCyan),
+            border = BorderStroke(1.dp, colors.cyan),
             shape = RoundedCornerShape(10.dp),
-            modifier = Modifier.fillMaxWidth().testTag("toggle_supabase_sql_button")
+            modifier = Modifier
+              .fillMaxWidth()
+              .defaultMinSize(minHeight = 48.dp)
+              .testTag("toggle_supabase_sql_button")
           ) {
-            Icon(imageVector = Icons.Default.DataObject, contentDescription = null, tint = SurfCyan, modifier = Modifier.size(16.dp))
+            Icon(imageVector = Icons.Default.DataObject, contentDescription = null, tint = colors.cyan, modifier = Modifier.size(16.dp))
             Spacer(modifier = Modifier.width(6.dp))
-            Text(if (showSqlSchema) "Hide Ocean Surfer SQL Schema" else "View Ocean Surfer SQL Schema (swell_call_logs)", color = SurfCyan, fontSize = 12.sp)
+            Text(if (showSqlSchema) "Hide Ocean Surfer SQL Schema" else "View Ocean Surfer SQL Schema (swell_call_logs)", color = colors.cyan, fontSize = 12.sp)
           }
 
           AnimatedVisibility(visible = showSqlSchema) {
@@ -470,7 +664,7 @@ fun IntegrationsScreen(
               modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 12.dp)
-                .background(OceanAbyss, RoundedCornerShape(12.dp))
+                .background(colors.abyss, RoundedCornerShape(12.dp))
                 .padding(12.dp)
             ) {
               Row(
@@ -480,7 +674,7 @@ fun IntegrationsScreen(
               ) {
                 Text(
                   text = "Supabase Ocean Surfer SQL DDL",
-                  color = GoldenSun,
+                  color = colors.goldenSun,
                   fontWeight = FontWeight.Bold,
                   fontSize = 11.sp
                 )
@@ -494,19 +688,21 @@ fun IntegrationsScreen(
                   },
                   modifier = Modifier.size(28.dp)
                 ) {
-                  Icon(imageVector = Icons.Default.ContentCopy, contentDescription = "Copy SQL", tint = SurfTurquoise)
+                  Icon(imageVector = Icons.Default.ContentCopy, contentDescription = "Copy SQL", tint = colors.turquoise)
                 }
               }
 
               Spacer(modifier = Modifier.height(6.dp))
 
-              Text(
-                text = sqlCode,
-                color = SandTextSecondary,
-                fontFamily = FontFamily.Monospace,
-                fontSize = 10.sp,
-                lineHeight = 14.sp
-              )
+              SelectionContainer {
+                Text(
+                  text = sqlCode,
+                  color = colors.textSecondary,
+                  fontFamily = FontFamily.Monospace,
+                  fontSize = 10.sp,
+                  lineHeight = 14.sp
+                )
+              }
             }
           }
         }
@@ -518,8 +714,8 @@ fun IntegrationsScreen(
           .fillMaxWidth()
           .testTag("github_integration_card"),
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = OceanDeepBlue),
-        border = BorderStroke(1.dp, SurfTeal.copy(alpha = 0.5f))
+        colors = CardDefaults.cardColors(containerColor = colors.deepBlue),
+        border = BorderStroke(1.dp, colors.teal.copy(alpha = 0.5f))
       ) {
         Column(modifier = Modifier.padding(16.dp)) {
           Row(
@@ -528,14 +724,14 @@ fun IntegrationsScreen(
           ) {
             Surface(
               shape = CircleShape,
-              color = GoldenSun.copy(alpha = 0.2f),
+              color = colors.goldenSun.copy(alpha = 0.2f),
               modifier = Modifier.size(40.dp)
             ) {
               Box(contentAlignment = Alignment.Center) {
                 Icon(
                   imageVector = Icons.Default.Language,
                   contentDescription = null,
-                  tint = GoldenSun,
+                  tint = colors.goldenSun,
                   modifier = Modifier.size(22.dp)
                 )
               }
@@ -546,13 +742,13 @@ fun IntegrationsScreen(
             Column(modifier = Modifier.weight(1f)) {
               Text(
                 text = "GitHub Pages Landing Hub",
-                color = SandTextPrimary,
+                color = colors.textPrimary,
                 fontWeight = FontWeight.Bold,
                 fontSize = 15.sp
               )
               Text(
                 text = "Repository ${gitHubConfig.repoOwner}/${gitHubConfig.repoName} (/docs/index.html)",
-                color = SurfCyan,
+                color = colors.cyan,
                 fontSize = 11.sp
               )
             }
@@ -562,7 +758,7 @@ fun IntegrationsScreen(
 
           Surface(
             shape = RoundedCornerShape(10.dp),
-            color = OceanCard,
+            color = colors.card,
             modifier = Modifier.fillMaxWidth()
           ) {
             Column(modifier = Modifier.padding(12.dp)) {
@@ -570,13 +766,13 @@ fun IntegrationsScreen(
                 Icon(
                   imageVector = Icons.Default.Code,
                   contentDescription = null,
-                  tint = SurfCyan,
+                  tint = colors.cyan,
                   modifier = Modifier.size(16.dp)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
                   text = "${gitHubConfig.repoOwner}/${gitHubConfig.repoName}",
-                  color = SandTextPrimary,
+                  color = colors.textPrimary,
                   fontWeight = FontWeight.Bold,
                   fontSize = 13.sp
                 )
@@ -584,25 +780,25 @@ fun IntegrationsScreen(
               Spacer(modifier = Modifier.height(4.dp))
               Text(
                 text = "Branch: ${gitHubConfig.branch} • GitHub Pages /docs Landing Page Included",
-                color = SandTextSecondary,
+                color = colors.textSecondary,
                 fontSize = 11.sp
               )
               Spacer(modifier = Modifier.height(4.dp))
               Text(
                 text = "Production Site: ${gitHubConfig.websiteUrl}",
-                color = SurfTurquoise,
+                color = colors.turquoise,
                 fontSize = 11.sp
               )
               Spacer(modifier = Modifier.height(2.dp))
               Text(
                 text = "GitHub URL: ${gitHubConfig.repoUrl}",
-                color = SurfCyan,
+                color = colors.cyan,
                 fontSize = 11.sp
               )
               Spacer(modifier = Modifier.height(6.dp))
               Text(
                 text = "Status: ${gitHubConfig.lastDeploymentStatus}",
-                color = SeaGreen,
+                color = colors.seaGreen,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.SemiBold
               )
@@ -617,13 +813,15 @@ fun IntegrationsScreen(
           ) {
             Button(
               onClick = { viewModel.triggerGitHubWebsiteDeploy() },
-              colors = ButtonDefaults.buttonColors(containerColor = OceanCardSecondary),
+              colors = ButtonDefaults.buttonColors(containerColor = colors.cardSecondary),
               shape = RoundedCornerShape(10.dp),
-              modifier = Modifier.weight(1f)
+              modifier = Modifier
+                .weight(1f)
+                .defaultMinSize(minHeight = 48.dp)
             ) {
               Icon(imageVector = Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
               Spacer(modifier = Modifier.width(2.dp))
-              Text("Sync", color = SurfCyan, fontSize = 11.sp)
+              Text("Sync", color = colors.cyan, fontSize = 11.sp)
             }
 
             Button(
@@ -631,13 +829,15 @@ fun IntegrationsScreen(
                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse(gitHubConfig.repoUrl))
                 try { context.startActivity(intent) } catch (_: Exception) {}
               },
-              colors = ButtonDefaults.buttonColors(containerColor = OceanCardSecondary),
+              colors = ButtonDefaults.buttonColors(containerColor = colors.cardSecondary),
               shape = RoundedCornerShape(10.dp),
-              modifier = Modifier.weight(1f)
+              modifier = Modifier
+                .weight(1f)
+                .defaultMinSize(minHeight = 48.dp)
             ) {
               Icon(imageVector = Icons.Default.Code, contentDescription = null, modifier = Modifier.size(14.dp))
               Spacer(modifier = Modifier.width(2.dp))
-              Text("Repo", color = GoldenSun, fontSize = 11.sp)
+              Text("Repo", color = colors.goldenSun, fontSize = 11.sp)
             }
 
             Button(
@@ -645,9 +845,11 @@ fun IntegrationsScreen(
                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse(gitHubConfig.websiteUrl))
                 try { context.startActivity(intent) } catch (_: Exception) {}
               },
-              colors = ButtonDefaults.buttonColors(containerColor = SurfTeal),
+              colors = ButtonDefaults.buttonColors(containerColor = colors.teal),
               shape = RoundedCornerShape(10.dp),
-              modifier = Modifier.weight(1f)
+              modifier = Modifier
+                .weight(1f)
+                .defaultMinSize(minHeight = 48.dp)
             ) {
               Icon(imageVector = Icons.Default.OpenInBrowser, contentDescription = null, modifier = Modifier.size(14.dp))
               Spacer(modifier = Modifier.width(2.dp))
@@ -658,6 +860,181 @@ fun IntegrationsScreen(
       }
 
       Spacer(modifier = Modifier.height(30.dp))
+    }
+  }
+}
+
+@Composable
+fun OceanThemeSwitcherCard(
+  activePalette: OceanPalette,
+  onSelectPalette: (OceanPalette) -> Unit,
+  onCyclePalette: () -> Unit,
+  modifier: Modifier = Modifier
+) {
+  val colors = OceanTheme.colors
+
+  Card(
+    modifier = modifier
+      .fillMaxWidth()
+      .testTag("theme_switcher_card"),
+    shape = RoundedCornerShape(18.dp),
+    colors = CardDefaults.cardColors(containerColor = colors.deepBlue),
+    border = BorderStroke(1.dp, colors.turquoise.copy(alpha = 0.55f))
+  ) {
+    Column(modifier = Modifier.padding(16.dp)) {
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+      ) {
+        Surface(
+          shape = CircleShape,
+          color = colors.turquoise.copy(alpha = 0.2f),
+          modifier = Modifier.size(40.dp)
+        ) {
+          Box(contentAlignment = Alignment.Center) {
+            Icon(
+              imageVector = Icons.Default.Palette,
+              contentDescription = "Ocean Theme Palette",
+              tint = colors.turquoise,
+              modifier = Modifier.size(22.dp)
+            )
+          }
+        }
+
+        Spacer(modifier = Modifier.width(10.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+          Text(
+            text = "Ocean Theme Switcher",
+            color = colors.textPrimary,
+            fontWeight = FontWeight.Bold,
+            fontSize = 15.sp
+          )
+          Text(
+            text = "Active: ${activePalette.displayName} • ${activePalette.tagline}",
+            color = colors.turquoise,
+            fontSize = 11.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+          )
+        }
+      }
+
+      Spacer(modifier = Modifier.height(12.dp))
+
+      // 2x2 Grid of Ocean Palette Cards with Color Swatches
+      Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        OceanPalette.entries.chunked(2).forEach { rowPalettes ->
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+          ) {
+            rowPalettes.forEach { palette ->
+              val isSelected = palette == activePalette
+              val preview = palette.colors
+              Card(
+                onClick = { onSelectPalette(palette) },
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = preview.card),
+                border = BorderStroke(
+                  width = if (isSelected) 2.dp else 1.dp,
+                  color = if (isSelected) preview.turquoise else preview.teal.copy(alpha = 0.45f)
+                ),
+                modifier = Modifier
+                  .weight(1f)
+                  .defaultMinSize(minHeight = 84.dp)
+                  .testTag("theme_option_${palette.name.lowercase()}")
+              ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                  Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                  ) {
+                    Text(
+                      text = palette.displayName,
+                      color = preview.textPrimary,
+                      fontWeight = FontWeight.Bold,
+                      fontSize = 13.sp,
+                      maxLines = 1,
+                      overflow = TextOverflow.Ellipsis,
+                      modifier = Modifier.weight(1f)
+                    )
+                    if (isSelected) {
+                      Icon(
+                        imageVector = Icons.Default.CheckCircle,
+                        contentDescription = "${palette.displayName} selected",
+                        tint = preview.turquoise,
+                        modifier = Modifier.size(16.dp)
+                      )
+                    }
+                  }
+
+                  Spacer(modifier = Modifier.height(4.dp))
+
+                  Text(
+                    text = palette.tagline,
+                    color = preview.textSecondary,
+                    fontSize = 10.sp,
+                    lineHeight = 13.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                  )
+
+                  Spacer(modifier = Modifier.height(8.dp))
+
+                  // Multi-color ocean swatch strip
+                  Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                  ) {
+                    listOf(
+                      preview.abyss,
+                      preview.turquoise,
+                      preview.cyan,
+                      preview.goldenSun,
+                      preview.seaGreen
+                    ).forEach { swatchColor ->
+                      Box(
+                        modifier = Modifier
+                          .size(14.dp)
+                          .clip(CircleShape)
+                          .background(swatchColor)
+                      )
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      Spacer(modifier = Modifier.height(12.dp))
+
+      Button(
+        onClick = onCyclePalette,
+        colors = ButtonDefaults.buttonColors(containerColor = colors.turquoise),
+        shape = RoundedCornerShape(10.dp),
+        modifier = Modifier
+          .fillMaxWidth()
+          .defaultMinSize(minHeight = 48.dp)
+          .testTag("cycle_theme_button")
+      ) {
+        Icon(
+          imageVector = Icons.Default.Waves,
+          contentDescription = null,
+          tint = colors.abyss,
+          modifier = Modifier.size(18.dp)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+          text = "Toggle Next Ocean Wave (${activePalette.next().displayName})",
+          color = colors.abyss,
+          fontWeight = FontWeight.Bold,
+          fontSize = 13.sp
+        )
+      }
     }
   }
 }

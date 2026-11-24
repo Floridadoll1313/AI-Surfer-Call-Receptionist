@@ -59,12 +59,20 @@ private val OceanLightColorScheme = lightColorScheme(
 
 @Composable
 fun MyApplicationTheme(
-  darkTheme: Boolean = true, // Default to stunning ocean surfer deep sea theme
-  dynamicColor: Boolean = false, // Keep intentional ocean surfer colors
+  darkTheme: Boolean = true,
+  dynamicColor: Boolean = false,
+  palette: OceanPalette = OceanPalette.DEEP_SEA,
+  onSelectPalette: (OceanPalette) -> Unit = {},
   content: @Composable () -> Unit,
 ) {
-  val colorScheme = if (darkTheme) OceanDarkColorScheme else OceanLightColorScheme
-
-  MaterialTheme(colorScheme = colorScheme, typography = Typography, content = content)
+  if (darkTheme) {
+    ThemeProvider(
+      palette = palette,
+      onSelectPalette = onSelectPalette,
+      content = content
+    )
+  } else {
+    MaterialTheme(colorScheme = OceanLightColorScheme, typography = Typography, content = content)
+  }
 }
 

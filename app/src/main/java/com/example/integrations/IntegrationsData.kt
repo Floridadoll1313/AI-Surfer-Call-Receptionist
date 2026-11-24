@@ -1,21 +1,40 @@
 package com.example.integrations
 
 import android.content.Context
+import com.example.BuildConfig
+import com.example.ui.theme.OceanPalette
 
 data class ChatGptConfig(
   val apiKey: String = "",
   val model: String = "gpt-4o-mini",
   val temperature: Double = 0.7,
   val isCustomPromptEnabled: Boolean = true,
-  val customPersona: String = "Kai - Ocean Tide Drop AI Surfer Master Receptionist"
+  val customPersona: String = "Kai - Ocean Tide Drop AI Surfer Master Receptionist",
+  val isEnabled: Boolean = true
 )
 
 data class SupabaseConfig(
-  val projectUrl: String = "https://kbgujyuxdopx.supabase.co",
-  val anonKey: String = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.oceantidedrop_mock_anon_key",
+  val projectUrl: String = defaultProjectUrl(),
+  val anonKey: String = defaultPublishableKey(),
   val isConnected: Boolean = true,
   val autoSyncCalls: Boolean = true
-)
+) {
+  companion object {
+    const val PLACEHOLDER_PUBLISHABLE_KEY = "VITE_SUPABASE_PUBLISHABLE_KEY_DEFAULT_VALUE"
+    const val DEFAULT_PROJECT_URL = "https://pdbpmnnjhzrfezfmvami.supabase.co"
+
+    fun defaultProjectUrl(): String {
+      return BuildConfig.VITE_SUPABASE_URL.trim().ifBlank { DEFAULT_PROJECT_URL }
+    }
+
+    fun defaultPublishableKey(): String {
+      val raw = BuildConfig.VITE_SUPABASE_PUBLISHABLE_KEY.trim()
+      return if (raw.isBlank() || raw == PLACEHOLDER_PUBLISHABLE_KEY) "" else raw
+    }
+
+    fun hasConfiguredBuildConfigKey(): Boolean = defaultPublishableKey().isNotBlank()
+  }
+}
 
 data class GitHubWebsiteConfig(
   val repoName: String = "AISurfer-",
@@ -194,6 +213,40 @@ object IntegrationPrefsStore {
   private const val KEY_ESCALATION_AUTO_EMAIL = "escalation_auto_email"
   private const val KEY_ESCALATION_HIGH_URGENCY = "escalation_high_urgency"
   private const val KEY_ESCALATION_WEBHOOK = "escalation_webhook_url"
+  private const val KEY_OCEAN_PALETTE = "ocean_theme_palette"
+  private const val KEY_CHATGPT_API_KEY = "chatgpt_api_key"
+  private const val KEY_CHATGPT_MODEL = "chatgpt_model"
+  private const val KEY_CHATGPT_ENABLED = "chatgpt_enabled"
+
+  fun saveChatGptConfig(context: Context, config: ChatGptConfig) {
+    context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
+      .putString(KEY_CHATGPT_API_KEY, config.apiKey)
+      .putString(KEY_CHATGPT_MODEL, config.model)
+      .putBoolean(KEY_CHATGPT_ENABLED, config.isEnabled)
+      .apply()
+  }
+
+  fun loadChatGptConfig(context: Context): ChatGptConfig {
+    val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    val defaults = ChatGptConfig()
+    return defaults.copy(
+      apiKey = prefs.getString(KEY_CHATGPT_API_KEY, defaults.apiKey)?.trim() ?: defaults.apiKey,
+      model = prefs.getString(KEY_CHATGPT_MODEL, defaults.model) ?: defaults.model,
+      isEnabled = prefs.getBoolean(KEY_CHATGPT_ENABLED, defaults.isEnabled)
+    )
+  }
+
+  fun saveOceanPalette(context: Context, palette: OceanPalette) {
+    context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
+      .putString(KEY_OCEAN_PALETTE, palette.name)
+      .apply()
+  }
+
+  fun loadOceanPalette(context: Context): OceanPalette {
+    val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    val stored = prefs.getString(KEY_OCEAN_PALETTE, OceanPalette.DEEP_SEA.name)
+    return OceanPalette.entries.firstOrNull { it.name == stored } ?: OceanPalette.DEEP_SEA
+  }
 
   fun saveSupabaseConfig(context: Context, config: SupabaseConfig) {
     context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
@@ -205,9 +258,25 @@ object IntegrationPrefsStore {
   fun loadSupabaseConfig(context: Context): SupabaseConfig {
     val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     val defaults = SupabaseConfig()
+    val storedUrl = prefs.getString(KEY_SUPABASE_URL, null)?.trim()
+    val storedKey = prefs.getString(KEY_SUPABASE_KEY, null)?.trim()
+    val resolvedUrl = if (
+      storedUrl.isNullOrBlank() ||
+      storedUrl.contains("kbgujyuxdopx.supabase.co") ||
+      storedUrl.contains("mkgnyarwiscttobnytin.supabase.co")
+    ) {
+      defaults.projectUrl
+    } else {
+      storedUrl
+    }
+    val resolvedKey = if (storedKey.isNullOrBlank() || storedKey.contains("oceantidedrop_mock_anon_key")) {
+      defaults.anonKey
+    } else {
+      storedKey
+    }
     return SupabaseConfig(
-      projectUrl = prefs.getString(KEY_SUPABASE_URL, defaults.projectUrl) ?: defaults.projectUrl,
-      anonKey = prefs.getString(KEY_SUPABASE_KEY, defaults.anonKey) ?: defaults.anonKey,
+      projectUrl = resolvedUrl,
+      anonKey = resolvedKey,
       isConnected = defaults.isConnected,
       autoSyncCalls = defaults.autoSyncCalls
     )

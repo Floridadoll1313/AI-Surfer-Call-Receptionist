@@ -33,18 +33,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.theme.CoralAlert
-import com.example.ui.theme.GoldenSun
-import com.example.ui.theme.OceanAbyss
-import com.example.ui.theme.OceanCard
-import com.example.ui.theme.OceanDeepBlue
-import com.example.ui.theme.SandTextPrimary
-import com.example.ui.theme.SandTextSecondary
-import com.example.ui.theme.SeaGreen
-import com.example.ui.theme.SunsetOrange
-import com.example.ui.theme.SurfCyan
-import com.example.ui.theme.SurfTeal
-import com.example.ui.theme.SurfTurquoise
+import com.example.ui.theme.OceanTheme
 import kotlin.math.sin
 
 @Composable
@@ -53,6 +42,7 @@ fun OceanWaveHeader(
   subtitle: String,
   modifier: Modifier = Modifier
 ) {
+  val colors = OceanTheme.colors
   val infiniteTransition = rememberInfiniteTransition(label = "wave_anim")
   val wavePhase by infiniteTransition.animateFloat(
     initialValue = 0f,
@@ -70,7 +60,7 @@ fun OceanWaveHeader(
       .height(130.dp)
       .background(
         Brush.verticalGradient(
-          colors = listOf(OceanAbyss, OceanDeepBlue, OceanCard)
+          colors = listOf(colors.abyss, colors.deepBlue, colors.card)
         )
       )
   ) {
@@ -99,9 +89,9 @@ fun OceanWaveHeader(
         path = wavePath,
         brush = Brush.horizontalGradient(
           colors = listOf(
-            SurfTeal.copy(alpha = 0.45f),
-            SurfCyan.copy(alpha = 0.35f),
-            SurfTurquoise.copy(alpha = 0.45f)
+            colors.teal.copy(alpha = 0.45f),
+            colors.cyan.copy(alpha = 0.35f),
+            colors.turquoise.copy(alpha = 0.45f)
           )
         )
       )
@@ -116,14 +106,14 @@ fun OceanWaveHeader(
     ) {
       Surface(
         shape = CircleShape,
-        color = SurfTurquoise.copy(alpha = 0.18f),
+        color = colors.turquoise.copy(alpha = 0.18f),
         modifier = Modifier.size(46.dp)
       ) {
         Box(contentAlignment = Alignment.Center) {
           Icon(
             imageVector = Icons.Default.Waves,
             contentDescription = "Wave Icon",
-            tint = SurfTurquoise,
+            tint = colors.turquoise,
             modifier = Modifier.size(28.dp)
           )
         }
@@ -139,13 +129,13 @@ fun OceanWaveHeader(
               fontWeight = FontWeight.ExtraBold,
               letterSpacing = 0.5.sp
             ),
-            color = SandTextPrimary
+            color = colors.textPrimary
           )
         }
         Text(
           text = subtitle,
           style = MaterialTheme.typography.bodySmall,
-          color = SurfCyan
+          color = colors.cyan
         )
       }
     }
@@ -154,11 +144,12 @@ fun OceanWaveHeader(
 
 @Composable
 fun UrgencyBadge(urgency: String, modifier: Modifier = Modifier) {
+  val colors = OceanTheme.colors
   val (bgColor, textColor, label) = when (urgency) {
-    "URGENT_VIP" -> Triple(CoralAlert, Color.White, "⚡ URGENT VIP")
-    "HIGH" -> Triple(SunsetOrange, Color.White, "🔥 HIGH")
-    "MEDIUM" -> Triple(GoldenSun.copy(alpha = 0.25f), GoldenSun, "🌊 MEDIUM")
-    else -> Triple(SeaGreen.copy(alpha = 0.2f), SeaGreen, "🌴 LOW")
+    "URGENT_VIP" -> Triple(colors.coralAlert, Color.White, "⚡ URGENT VIP")
+    "HIGH" -> Triple(colors.sunsetOrange, Color.White, "🔥 HIGH")
+    "MEDIUM" -> Triple(colors.goldenSun.copy(alpha = 0.25f), colors.goldenSun, "🌊 MEDIUM")
+    else -> Triple(colors.seaGreen.copy(alpha = 0.2f), colors.seaGreen, "🌴 LOW")
   }
 
   Surface(
@@ -180,7 +171,7 @@ fun UrgencyBadge(urgency: String, modifier: Modifier = Modifier) {
 fun AudioWaveformIndicator(
   waveHeights: List<Float>,
   modifier: Modifier = Modifier,
-  tint: Color = SurfTurquoise
+  tint: Color = OceanTheme.colors.turquoise
 ) {
   Row(
     modifier = modifier,

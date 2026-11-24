@@ -12,6 +12,9 @@ interface CallDao {
   @Query("SELECT * FROM calls ORDER BY timestamp DESC")
   fun getAllCalls(): Flow<List<CallEntity>>
 
+  @Query("SELECT * FROM calls ORDER BY timestamp DESC LIMIT :limit")
+  fun getLatestCalls(limit: Int = 25): Flow<List<CallEntity>>
+
   @Query("SELECT * FROM calls WHERE id = :id")
   suspend fun getCallById(id: Long): CallEntity?
 

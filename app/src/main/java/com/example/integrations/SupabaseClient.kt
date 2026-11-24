@@ -68,19 +68,19 @@ interface SupabaseRestApi {
   @GET("rest/v1/calls?select=*&order=id.desc&limit=50")
   suspend fun fetchCalls(
     @Header("apikey") apiKey: String,
-    @Header("Authorization") bearer: String
+    @Header("Authorization") bearer: String?
   ): Response<List<SupabaseCallRecordDto>>
 
   @GET("rest/v1/calls?select=id&limit=1")
   suspend fun pingCallsTable(
     @Header("apikey") apiKey: String,
-    @Header("Authorization") bearer: String
+    @Header("Authorization") bearer: String?
   ): Response<List<SupabaseCallRecordDto>>
 
   @POST("rest/v1/calls")
   suspend fun insertCall(
     @Header("apikey") apiKey: String,
-    @Header("Authorization") bearer: String,
+    @Header("Authorization") bearer: String?,
     @Header("Prefer") prefer: String = "return=representation",
     @Body body: SupabaseCallRecordDto
   ): Response<List<SupabaseCallRecordDto>>
@@ -88,7 +88,7 @@ interface SupabaseRestApi {
   @PATCH("rest/v1/calls")
   suspend fun patchCallStatus(
     @Header("apikey") apiKey: String,
-    @Header("Authorization") bearer: String,
+    @Header("Authorization") bearer: String?,
     @Header("Prefer") prefer: String = "return=representation",
     @Query("id") idEq: String,
     @Body body: SupabaseCallPatchDto
@@ -97,7 +97,7 @@ interface SupabaseRestApi {
   @POST("rest/v1/wave_audit_leads")
   suspend fun submitWaveAuditLead(
     @Header("apikey") apiKey: String,
-    @Header("Authorization") bearer: String,
+    @Header("Authorization") bearer: String?,
     @Header("Prefer") prefer: String = "return=representation",
     @Body body: SupabaseWaveAuditLeadDto
   ): Response<List<SupabaseWaveAuditLeadDto>>
@@ -108,12 +108,31 @@ object SupabaseClient {
   private val okHttpClient: OkHttpClient by lazy {
     val logging = HttpLoggingInterceptor().apply {
       level = HttpLoggingInterceptor.Level.BASIC
+      redactHeader("apikey")
+      redactHeader("Authorization")
     }
     OkHttpClient.Builder()
       .addInterceptor(logging)
       .connectTimeout(12, TimeUnit.SECONDS)
       .readTimeout(15, TimeUnit.SECONDS)
       .build()
+  }
+
+  fun resolveBearerHeader(apiKey: String): String? {
+    val trimmed = apiKey.trim()
+    return if (trimmed.count { it == '.' } == 2 && !trimmed.startsWith("sb_publishable_")) {
+      "Bearer $trimmed"
+    } else {
+      null
+    }
+  }
+
+  fun extractHost(rawUrl: String): String {
+    return rawUrl.trim()
+      .removePrefix("https://")
+      .removePrefix("http://")
+      .substringBefore("/")
+      .ifBlank { "pdbpmnnjhzrfezfmvami.supabase.co" }
   }
 
   private fun normalizeBaseUrl(rawUrl: String): String? {
@@ -135,15 +154,16 @@ object SupabaseClient {
     val baseUrl = normalizeBaseUrl(config.projectUrl)
       ?: return SupabaseConnectionState.Error("Invalid Supabase URL. Expected https://<project>.supabase.co")
     if (config.anonKey.isBlank()) {
-      return SupabaseConnectionState.Error("Supabase Anon Key is required.")
+      return SupabaseConnectionState.Error("Supabase Publishable / Anon Key is missing. Set VITE_SUPABASE_PUBLISHABLE_KEY in the AI Studio Secrets panel or Settings.")
     }
 
     val start = System.currentTimeMillis()
     return try {
       val api = buildApi(baseUrl)
+      val key = config.anonKey.trim()
       val response = api.pingCallsTable(
-        apiKey = config.anonKey.trim(),
-        bearer = "Bearer ${config.anonKey.trim()}"
+        apiKey = key,
+        bearer = resolveBearerHeader(key)
       )
       val elapsed = System.currentTimeMillis() - start
       if (response.isSuccessful) {
@@ -153,7 +173,7 @@ object SupabaseClient {
         )
       } else {
         SupabaseConnectionState.Error(
-          "Supabase responded HTTP ${response.code()} (${response.message()}). Verify anon key & RLS policies on public.calls."
+          "Supabase responded HTTP ${response.code()} (${response.message()}). Verify publishable key & RLS policies on public.calls."
         )
       }
     } catch (e: Exception) {
@@ -167,13 +187,14 @@ object SupabaseClient {
     val baseUrl = normalizeBaseUrl(config.projectUrl)
       ?: return Result.failure(IllegalArgumentException("Invalid Supabase project URL"))
     if (config.anonKey.isBlank()) {
-      return Result.failure(IllegalArgumentException("Missing Supabase anon key"))
+      return Result.failure(IllegalArgumentException("Missing Supabase publishable/anon key"))
     }
     return try {
       val api = buildApi(baseUrl)
+      val key = config.anonKey.trim()
       val response = api.fetchCalls(
-        apiKey = config.anonKey.trim(),
-        bearer = "Bearer ${config.anonKey.trim()}"
+        apiKey = key,
+        bearer = resolveBearerHeader(key)
       )
       if (!response.isSuccessful) {
         return Result.failure(IllegalStateException("HTTP ${response.code()} from Supabase PostgREST"))
@@ -210,10 +231,11 @@ object SupabaseClient {
     val baseUrl = normalizeBaseUrl(config.projectUrl)
       ?: return Result.failure(IllegalArgumentException("Invalid Supabase URL"))
     if (config.anonKey.isBlank()) {
-      return Result.failure(IllegalArgumentException("Missing Supabase anon key"))
+      return Result.failure(IllegalArgumentException("Missing Supabase publishable/anon key"))
     }
     return try {
       val api = buildApi(baseUrl)
+      val key = config.anonKey.trim()
       val dto = SupabaseCallRecordDto(
         callerNumber = call.callerNumber,
         callerName = call.callerName,
@@ -232,8 +254,8 @@ object SupabaseClient {
         escalationNotes = call.escalationNotes
       )
       val resp = api.insertCall(
-        apiKey = config.anonKey.trim(),
-        bearer = "Bearer ${config.anonKey.trim()}",
+        apiKey = key,
+        bearer = resolveBearerHeader(key),
         body = dto
       )
       if (resp.isSuccessful) Result.success(Unit)
@@ -250,13 +272,14 @@ object SupabaseClient {
     val baseUrl = normalizeBaseUrl(config.projectUrl)
       ?: return Result.failure(IllegalArgumentException("Invalid Supabase URL"))
     if (config.anonKey.isBlank()) {
-      return Result.failure(IllegalArgumentException("Missing Supabase anon key"))
+      return Result.failure(IllegalArgumentException("Missing Supabase publishable/anon key"))
     }
     return try {
       val api = buildApi(baseUrl)
+      val key = config.anonKey.trim()
       val resp = api.submitWaveAuditLead(
-        apiKey = config.anonKey.trim(),
-        bearer = "Bearer ${config.anonKey.trim()}",
+        apiKey = key,
+        bearer = resolveBearerHeader(key),
         body = lead
       )
       if (resp.isSuccessful) Result.success(Unit)

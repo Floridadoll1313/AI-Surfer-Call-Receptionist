@@ -37,6 +37,7 @@ class VoiceReceptionistController(
   private var speechRecognizer: SpeechRecognizer? = null
   private var tts: TextToSpeech? = null
   private var ttsReady = false
+  private var pendingTranscriptCallback: ((String) -> Unit)? = null
 
   init {
     tts = TextToSpeech(context.applicationContext) { status ->
@@ -93,8 +94,9 @@ class VoiceReceptionistController(
     }
   }
 
-  fun startListening() {
+  fun startListening(onTranscriptCaptured: ((String) -> Unit)? = null) {
     mainHandler.post {
+      pendingTranscriptCallback = onTranscriptCaptured
       if (!SpeechRecognizer.isRecognitionAvailable(context)) {
         _uiState.value = _uiState.value.copy(
           isSpeechAvailable = false,
@@ -134,13 +136,19 @@ class VoiceReceptionistController(
           override fun onResults(results: Bundle?) {
             val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
             val transcript = matches?.firstOrNull()?.trim().orEmpty()
+            val callback = pendingTranscriptCallback
+            pendingTranscriptCallback = null
             _uiState.value = _uiState.value.copy(
               isListening = false,
               partialTranscript = "",
               statusMessage = if (transcript.isNotBlank()) "Captured speech" else ""
             )
             if (transcript.isNotBlank()) {
-              onFinalTranscript(transcript)
+              if (callback != null) {
+                callback(transcript)
+              } else {
+                onFinalTranscript(transcript)
+              }
             }
           }
 
@@ -173,6 +181,7 @@ class VoiceReceptionistController(
 
   fun stopListening() {
     mainHandler.post {
+      pendingTranscriptCallback = null
       try {
         speechRecognizer?.stopListening()
       } catch (_: Exception) {}

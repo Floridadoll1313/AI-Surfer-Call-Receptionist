@@ -72,6 +72,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -87,21 +88,10 @@ import com.example.data.local.CallEntity
 import com.example.integrations.EscalationAlertChannel
 import com.example.integrations.EscalationTriggerConfig
 import com.example.integrations.SupabaseCallFetcher
+import com.example.integrations.SupabaseClient
+import com.example.integrations.SupabaseConfig
 import com.example.telephony.CallEscalationManager
-import com.example.ui.theme.CoralAlert
-import com.example.ui.theme.GoldenSun
-import com.example.ui.theme.OceanAbyss
-import com.example.ui.theme.OceanCard
-import com.example.ui.theme.OceanCardSecondary
-import com.example.ui.theme.OceanDeepBlue
-import com.example.ui.theme.OceanSurface
-import com.example.ui.theme.SandTextPrimary
-import com.example.ui.theme.SandTextSecondary
-import com.example.ui.theme.SeaGreen
-import com.example.ui.theme.SunsetOrange
-import com.example.ui.theme.SurfCyan
-import com.example.ui.theme.SurfTeal
-import com.example.ui.theme.SurfTurquoise
+import com.example.ui.theme.OceanTheme
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -150,13 +140,45 @@ fun SupabaseCallsDashboard(
   onMarkPending: (Long) -> Unit,
   onTriggerEscalation: (CallEntity) -> Unit,
   onDeleteCall: (Long) -> Unit,
+  supabaseProjectUrl: String = SupabaseConfig.defaultProjectUrl(),
+  searchQuery: String? = null,
+  onSearchQueryChange: ((String) -> Unit)? = null,
+  selectedDateFilter: CallDateFilter? = null,
+  onSelectDateFilter: ((CallDateFilter) -> Unit)? = null,
+  customStartDateUtcMillis: Long? = null,
+  customEndDateUtcMillis: Long? = null,
+  onSelectCustomDateRange: ((Long?, Long?) -> Unit)? = null,
   modifier: Modifier = Modifier
 ) {
   val context = LocalContext.current
+  val colors = OceanTheme.colors
   var selectedCategory by remember { mutableStateOf(DashboardCategory.ALL) }
-  var searchQuery by remember { mutableStateOf("") }
+  var localSearchQuery by rememberSaveable { mutableStateOf("") }
+  var localDateFilter by rememberSaveable { mutableStateOf(CallDateFilter.ALL) }
+  var localCustomStart by rememberSaveable { mutableStateOf<Long?>(null) }
+  var localCustomEnd by rememberSaveable { mutableStateOf<Long?>(null) }
   var inspectingCallForSupabaseJson by remember { mutableStateOf<CallEntity?>(null) }
   var showTriggerSettings by remember { mutableStateOf(false) }
+
+  val activeSearchQuery = searchQuery ?: localSearchQuery
+  val activeDateFilter = selectedDateFilter ?: localDateFilter
+  val activeCustomStart = if (onSelectCustomDateRange != null) customStartDateUtcMillis else localCustomStart
+  val activeCustomEnd = if (onSelectCustomDateRange != null) customEndDateUtcMillis else localCustomEnd
+
+  val handleSearchChange: (String) -> Unit = { updated ->
+    if (onSearchQueryChange != null) onSearchQueryChange(updated) else localSearchQuery = updated
+  }
+  val handleDateFilterChange: (CallDateFilter) -> Unit = { updated ->
+    if (onSelectDateFilter != null) onSelectDateFilter(updated) else localDateFilter = updated
+  }
+  val handleCustomRangeChange: (Long?, Long?) -> Unit = { start, end ->
+    if (onSelectCustomDateRange != null) {
+      onSelectCustomDateRange(start, end)
+    } else {
+      localCustomStart = start
+      localCustomEnd = end
+    }
+  }
 
   // Status filter counts
   val statusCounts = remember(calls) {
@@ -179,8 +201,16 @@ fun SupabaseCallsDashboard(
     }
   }
 
-  // Filtered by Status, Category, and Search
-  val filteredCalls = remember(calls, selectedStatusFilter, selectedCategory, searchQuery) {
+  // Filtered by Status, Category, Date Range, and Search
+  val filteredCalls = remember(
+    calls,
+    selectedStatusFilter,
+    selectedCategory,
+    activeSearchQuery,
+    activeDateFilter,
+    activeCustomStart,
+    activeCustomEnd
+  ) {
     calls.filter { call ->
       val matchesStatus = when (selectedStatusFilter) {
         CallStatusFilter.ALL -> true
@@ -196,16 +226,15 @@ fun SupabaseCallsDashboard(
         else -> categorizeCall(call) == selectedCategory
       }
 
-      val matchesSearch = if (searchQuery.isBlank()) true else {
-        val query = searchQuery.trim().lowercase()
-        call.callerName.lowercase().contains(query) ||
-        call.callerNumber.lowercase().contains(query) ||
-        call.customerQuestion.lowercase().contains(query) ||
-        call.summary.lowercase().contains(query) ||
-        call.aiResponse.lowercase().contains(query)
-      }
+      val matchesSearch = CallFilterMatcher.matchesSearch(call, activeSearchQuery)
+      val matchesDate = CallFilterMatcher.matchesDateFilter(
+        timestampMillis = call.timestamp,
+        filter = activeDateFilter,
+        customStartUtcMillis = activeCustomStart,
+        customEndUtcMillis = activeCustomEnd
+      )
 
-      matchesStatus && matchesCategory && matchesSearch
+      matchesStatus && matchesCategory && matchesSearch && matchesDate
     }
   }
 
@@ -213,8 +242,8 @@ fun SupabaseCallsDashboard(
     // Top Bar: Supabase Sync Status and Action
     Card(
       shape = RoundedCornerShape(16.dp),
-      colors = CardDefaults.cardColors(containerColor = OceanDeepBlue),
-      border = BorderStroke(1.dp, SurfTeal.copy(alpha = 0.5f)),
+      colors = CardDefaults.cardColors(containerColor = colors.deepBlue),
+      border = BorderStroke(1.dp, colors.teal.copy(alpha = 0.5f)),
       modifier = Modifier
         .fillMaxWidth()
         .padding(horizontal = 16.dp, vertical = 6.dp)
@@ -228,14 +257,14 @@ fun SupabaseCallsDashboard(
       ) {
         Surface(
           shape = CircleShape,
-          color = SeaGreen.copy(alpha = 0.2f),
+          color = colors.seaGreen.copy(alpha = 0.2f),
           modifier = Modifier.size(42.dp)
         ) {
           Box(contentAlignment = Alignment.Center) {
             Icon(
               imageVector = Icons.Default.Storage,
               contentDescription = "Supabase DB",
-              tint = SeaGreen,
+              tint = colors.seaGreen,
               modifier = Modifier.size(24.dp)
             )
           }
@@ -248,17 +277,17 @@ fun SupabaseCallsDashboard(
             Text(
               text = "Supabase Call Logs",
               fontWeight = FontWeight.Bold,
-              color = SandTextPrimary,
+              color = colors.textPrimary,
               fontSize = 14.sp
             )
             Spacer(modifier = Modifier.width(6.dp))
             Surface(
               shape = RoundedCornerShape(4.dp),
-              color = SeaGreen.copy(alpha = 0.25f)
+              color = colors.seaGreen.copy(alpha = 0.25f)
             ) {
               Text(
                 text = "public.calls",
-                color = SeaGreen,
+                color = colors.seaGreen,
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -267,14 +296,14 @@ fun SupabaseCallsDashboard(
           }
           Spacer(modifier = Modifier.height(2.dp))
           Text(
-            text = "Connected: kbgujyuxdopx.supabase.co • $lastSupabaseFetchTime",
-            color = SandTextSecondary,
+            text = "Connected: ${SupabaseClient.extractHost(supabaseProjectUrl)} • $lastSupabaseFetchTime",
+            color = colors.textSecondary,
             fontSize = 11.sp
           )
           Spacer(modifier = Modifier.height(4.dp))
           Surface(
             shape = RoundedCornerShape(6.dp),
-            color = if (unsyncedCallCount > 0) SunsetOrange.copy(alpha = 0.22f) else SeaGreen.copy(alpha = 0.18f),
+            color = if (unsyncedCallCount > 0) colors.sunsetOrange.copy(alpha = 0.22f) else colors.seaGreen.copy(alpha = 0.18f),
             modifier = Modifier.testTag("supabase_retry_queue_badge")
           ) {
             Text(
@@ -283,7 +312,7 @@ fun SupabaseCallsDashboard(
               } else {
                 "All synced with WorkManager retry guard"
               },
-              color = if (unsyncedCallCount > 0) GoldenSun else SeaGreen,
+              color = if (unsyncedCallCount > 0) colors.goldenSun else colors.seaGreen,
               fontSize = 10.sp,
               fontWeight = FontWeight.SemiBold,
               modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -294,7 +323,7 @@ fun SupabaseCallsDashboard(
         Button(
           onClick = onFetchFromSupabase,
           enabled = !isFetchingFromSupabase,
-          colors = ButtonDefaults.buttonColors(containerColor = SurfTeal),
+          colors = ButtonDefaults.buttonColors(containerColor = colors.teal),
           shape = RoundedCornerShape(10.dp),
           modifier = Modifier.testTag("fetch_supabase_button")
         ) {
@@ -316,8 +345,8 @@ fun SupabaseCallsDashboard(
     // AI Escalation Alert Trigger Quick Card
     Card(
       shape = RoundedCornerShape(14.dp),
-      colors = CardDefaults.cardColors(containerColor = OceanDeepBlue),
-      border = BorderStroke(1.dp, if (escalationTriggerConfig.isEnabled) CoralAlert.copy(alpha = 0.5f) else SurfTeal.copy(alpha = 0.3f)),
+      colors = CardDefaults.cardColors(containerColor = colors.deepBlue),
+      border = BorderStroke(1.dp, if (escalationTriggerConfig.isEnabled) colors.coralAlert.copy(alpha = 0.5f) else colors.teal.copy(alpha = 0.3f)),
       modifier = Modifier
         .fillMaxWidth()
         .padding(horizontal = 16.dp, vertical = 4.dp)
@@ -331,27 +360,27 @@ fun SupabaseCallsDashboard(
           Icon(
             imageVector = Icons.Default.NotificationsActive,
             contentDescription = null,
-            tint = if (escalationTriggerConfig.isEnabled) CoralAlert else SandTextSecondary,
+            tint = if (escalationTriggerConfig.isEnabled) colors.coralAlert else colors.textSecondary,
             modifier = Modifier.size(18.dp)
           )
           Spacer(modifier = Modifier.width(8.dp))
           Column(modifier = Modifier.weight(1f)) {
             Text(
               text = "AI Escalation Alert Trigger: ${if (escalationTriggerConfig.isEnabled) escalationTriggerConfig.alertChannel.label else "Paused"}",
-              color = SandTextPrimary,
+              color = colors.textPrimary,
               fontSize = 12.sp,
               fontWeight = FontWeight.Bold
             )
             Text(
               text = "Destination: ${escalationTriggerConfig.targetEmail}",
-              color = SandTextSecondary,
+              color = colors.textSecondary,
               fontSize = 10.sp
             )
           }
           TextButton(onClick = { showTriggerSettings = !showTriggerSettings }) {
             Text(
               text = if (showTriggerSettings) "Hide" else "Configure",
-              color = SurfTurquoise,
+              color = colors.turquoise,
               fontSize = 11.sp,
               fontWeight = FontWeight.Bold
             )
@@ -373,7 +402,7 @@ fun SupabaseCallsDashboard(
             ) {
               Text(
                 text = "Auto-alert when AI flags call",
-                color = SandTextPrimary,
+                color = colors.textPrimary,
                 fontSize = 12.sp
               )
               Switch(
@@ -383,7 +412,7 @@ fun SupabaseCallsDashboard(
                 },
                 colors = SwitchDefaults.colors(
                   checkedThumbColor = Color.White,
-                  checkedTrackColor = SeaGreen
+                  checkedTrackColor = colors.seaGreen
                 )
               )
             }
@@ -403,10 +432,10 @@ fun SupabaseCallsDashboard(
                   },
                   label = { Text(channel.label, fontSize = 11.sp) },
                   colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = CoralAlert,
+                    selectedContainerColor = colors.coralAlert,
                     selectedLabelColor = Color.White,
-                    containerColor = OceanCard,
-                    labelColor = SandTextPrimary
+                    containerColor = colors.card,
+                    labelColor = colors.textPrimary
                   )
                 )
               }
@@ -425,10 +454,10 @@ fun SupabaseCallsDashboard(
                 singleLine = true,
                 modifier = Modifier.weight(1f),
                 colors = OutlinedTextFieldDefaults.colors(
-                  focusedBorderColor = SurfTurquoise,
-                  unfocusedBorderColor = SurfTeal.copy(alpha = 0.5f),
-                  focusedTextColor = SandTextPrimary,
-                  unfocusedTextColor = SandTextPrimary
+                  focusedBorderColor = colors.turquoise,
+                  unfocusedBorderColor = colors.teal.copy(alpha = 0.5f),
+                  focusedTextColor = colors.textPrimary,
+                  unfocusedTextColor = colors.textPrimary
                 )
               )
               Button(
@@ -440,7 +469,7 @@ fun SupabaseCallsDashboard(
                     webhookDraft
                   )
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = SurfTeal),
+                colors = ButtonDefaults.buttonColors(containerColor = colors.teal),
                 shape = RoundedCornerShape(10.dp)
               ) {
                 Text("Save", fontSize = 11.sp, color = Color.White)
@@ -463,10 +492,10 @@ fun SupabaseCallsDashboard(
                   .weight(1f)
                   .testTag("dashboard_escalation_webhook_input"),
                 colors = OutlinedTextFieldDefaults.colors(
-                  focusedBorderColor = SurfTurquoise,
-                  unfocusedBorderColor = SurfTeal.copy(alpha = 0.5f),
-                  focusedTextColor = SandTextPrimary,
-                  unfocusedTextColor = SandTextPrimary
+                  focusedBorderColor = colors.turquoise,
+                  unfocusedBorderColor = colors.teal.copy(alpha = 0.5f),
+                  focusedTextColor = colors.textPrimary,
+                  unfocusedTextColor = colors.textPrimary
                 )
               )
               Button(
@@ -478,7 +507,7 @@ fun SupabaseCallsDashboard(
                     webhookDraft
                   )
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = SurfTeal),
+                colors = ButtonDefaults.buttonColors(containerColor = colors.teal),
                 shape = RoundedCornerShape(10.dp)
               ) {
                 Text("Save", fontSize = 11.sp, color = Color.White)
@@ -488,7 +517,7 @@ fun SupabaseCallsDashboard(
             Spacer(modifier = Modifier.height(8.dp))
             Button(
               onClick = onTriggerTestEscalation,
-              colors = ButtonDefaults.buttonColors(containerColor = CoralAlert),
+              colors = ButtonDefaults.buttonColors(containerColor = colors.coralAlert),
               shape = RoundedCornerShape(10.dp),
               modifier = Modifier
                 .fillMaxWidth()
@@ -513,61 +542,52 @@ fun SupabaseCallsDashboard(
       KpiMetricCard(
         title = "Total Calls",
         count = calls.size.toString(),
-        tint = SurfCyan,
+        tint = colors.cyan,
         modifier = Modifier.weight(1f)
       )
       KpiMetricCard(
         title = "Pending",
         count = (statusCounts[CallStatusFilter.PENDING] ?: 0).toString(),
-        tint = SunsetOrange,
+        tint = colors.sunsetOrange,
         modifier = Modifier.weight(1f)
       )
       KpiMetricCard(
         title = "Leads",
         count = (categoryCounts[DashboardCategory.LEADS] ?: 0).toString(),
-        tint = SeaGreen,
+        tint = colors.seaGreen,
         modifier = Modifier.weight(1f)
       )
       KpiMetricCard(
         title = "Escalated",
         count = (statusCounts[CallStatusFilter.ESCALATED] ?: 0).toString(),
-        tint = CoralAlert,
+        tint = colors.coralAlert,
         modifier = Modifier.weight(1f)
       )
     }
 
-    // Search Input
-    OutlinedTextField(
-      value = searchQuery,
-      onValueChange = { searchQuery = it },
-      placeholder = { Text("Search caller, phone, inquiry or summary...", color = SandTextSecondary, fontSize = 12.sp) },
-      leadingIcon = { Icon(imageVector = Icons.Default.Search, contentDescription = "Search", tint = SurfCyan, modifier = Modifier.size(18.dp)) },
-      trailingIcon = {
-        if (searchQuery.isNotEmpty()) {
-          IconButton(onClick = { searchQuery = "" }) {
-            Icon(imageVector = Icons.Default.Clear, contentDescription = "Clear", tint = SandTextSecondary, modifier = Modifier.size(18.dp))
-          }
-        }
-      },
-      shape = RoundedCornerShape(12.dp),
-      colors = OutlinedTextFieldDefaults.colors(
-        focusedBorderColor = SurfTurquoise,
-        unfocusedBorderColor = SurfTeal.copy(alpha = 0.5f),
-        focusedTextColor = SandTextPrimary,
-        unfocusedTextColor = SandTextPrimary,
-        focusedContainerColor = OceanDeepBlue,
-        unfocusedContainerColor = OceanDeepBlue
-      ),
-      modifier = Modifier
-        .fillMaxWidth()
-        .padding(horizontal = 16.dp, vertical = 6.dp)
-        .testTag("call_search_input")
+    // Search Input & Date Filter
+    CallSearchBar(
+      query = activeSearchQuery,
+      onQueryChange = handleSearchChange,
+      searchFieldTag = "call_search_input",
+      clearButtonTag = "clear_call_search_button",
+      modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+    )
+
+    CallDateFilterBar(
+      selectedFilter = activeDateFilter,
+      customStartUtcMillis = activeCustomStart,
+      customEndUtcMillis = activeCustomEnd,
+      onSelectDateFilter = handleDateFilterChange,
+      onSelectCustomRange = handleCustomRangeChange,
+      chipTagPrefix = "date_filter_chip_",
+      modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
     )
 
     // Status Filters (Horizontal Scrollable)
     Text(
       text = "STATUS FILTERS",
-      color = SurfCyan,
+      color = colors.cyan,
       fontSize = 10.sp,
       fontWeight = FontWeight.ExtraBold,
       letterSpacing = 1.sp,
@@ -592,14 +612,14 @@ fun SupabaseCallsDashboard(
               contentDescription = null,
               modifier = Modifier.size(14.dp),
               tint = when {
-                isSelected && statusFilter == CallStatusFilter.ALL -> OceanAbyss
-                isSelected && statusFilter == CallStatusFilter.REVIEWED -> OceanAbyss
+                isSelected && statusFilter == CallStatusFilter.ALL -> colors.abyss
+                isSelected && statusFilter == CallStatusFilter.REVIEWED -> colors.abyss
                 isSelected -> Color.White
-                statusFilter == CallStatusFilter.ESCALATED -> CoralAlert
-                statusFilter == CallStatusFilter.PENDING -> SunsetOrange
-                statusFilter == CallStatusFilter.REVIEWED -> SeaGreen
-                statusFilter == CallStatusFilter.URGENT_VIP -> GoldenSun
-                else -> SurfCyan
+                statusFilter == CallStatusFilter.ESCALATED -> colors.coralAlert
+                statusFilter == CallStatusFilter.PENDING -> colors.sunsetOrange
+                statusFilter == CallStatusFilter.REVIEWED -> colors.seaGreen
+                statusFilter == CallStatusFilter.URGENT_VIP -> colors.goldenSun
+                else -> colors.cyan
               }
             )
           },
@@ -612,19 +632,19 @@ fun SupabaseCallsDashboard(
           },
           colors = FilterChipDefaults.filterChipColors(
             selectedContainerColor = when (statusFilter) {
-              CallStatusFilter.ESCALATED -> CoralAlert
-              CallStatusFilter.PENDING -> SunsetOrange
-              CallStatusFilter.REVIEWED -> SeaGreen
-              CallStatusFilter.URGENT_VIP -> GoldenSun
-              CallStatusFilter.ALL -> SurfTurquoise
+              CallStatusFilter.ESCALATED -> colors.coralAlert
+              CallStatusFilter.PENDING -> colors.sunsetOrange
+              CallStatusFilter.REVIEWED -> colors.seaGreen
+              CallStatusFilter.URGENT_VIP -> colors.goldenSun
+              CallStatusFilter.ALL -> colors.turquoise
             },
-            selectedLabelColor = if (statusFilter == CallStatusFilter.ALL || statusFilter == CallStatusFilter.REVIEWED || statusFilter == CallStatusFilter.URGENT_VIP) OceanAbyss else Color.White,
-            containerColor = OceanDeepBlue,
-            labelColor = SandTextPrimary
+            selectedLabelColor = if (statusFilter == CallStatusFilter.ALL || statusFilter == CallStatusFilter.REVIEWED || statusFilter == CallStatusFilter.URGENT_VIP) colors.abyss else Color.White,
+            containerColor = colors.deepBlue,
+            labelColor = colors.textPrimary
           ),
           border = BorderStroke(
             width = 1.dp,
-            color = if (isSelected) Color.Transparent else SurfTeal.copy(alpha = 0.45f)
+            color = if (isSelected) Color.Transparent else colors.teal.copy(alpha = 0.45f)
           ),
           modifier = Modifier.testTag("status_filter_chip_${statusFilter.id.lowercase()}")
         )
@@ -634,7 +654,7 @@ fun SupabaseCallsDashboard(
     // Category Filter Chips (Horizontal Scrollable)
     Text(
       text = "TOPIC CATEGORIES",
-      color = SandTextSecondary,
+      color = colors.textSecondary,
       fontSize = 10.sp,
       fontWeight = FontWeight.ExtraBold,
       letterSpacing = 1.sp,
@@ -662,19 +682,19 @@ fun SupabaseCallsDashboard(
           },
           colors = FilterChipDefaults.filterChipColors(
             selectedContainerColor = when (category) {
-              DashboardCategory.ESCALATED -> CoralAlert
-              DashboardCategory.LEADS -> SeaGreen
-              DashboardCategory.PURCHASES -> GoldenSun
-              DashboardCategory.ENTERPRISE -> SunsetOrange
-              else -> SurfTurquoise
+              DashboardCategory.ESCALATED -> colors.coralAlert
+              DashboardCategory.LEADS -> colors.seaGreen
+              DashboardCategory.PURCHASES -> colors.goldenSun
+              DashboardCategory.ENTERPRISE -> colors.sunsetOrange
+              else -> colors.turquoise
             },
-            selectedLabelColor = if (category == DashboardCategory.PURCHASES) OceanAbyss else if (category == DashboardCategory.ALL) OceanAbyss else Color.White,
-            containerColor = OceanCard,
-            labelColor = SandTextPrimary
+            selectedLabelColor = if (category == DashboardCategory.PURCHASES) colors.abyss else if (category == DashboardCategory.ALL) colors.abyss else Color.White,
+            containerColor = colors.card,
+            labelColor = colors.textPrimary
           ),
           border = BorderStroke(
             width = 1.dp,
-            color = if (selectedCategory == category) Color.Transparent else SurfTeal.copy(alpha = 0.4f)
+            color = if (selectedCategory == category) Color.Transparent else colors.teal.copy(alpha = 0.4f)
           ),
           modifier = Modifier.testTag("filter_chip_${category.id.lowercase()}")
         )
@@ -693,19 +713,23 @@ fun SupabaseCallsDashboard(
           Icon(
             imageVector = Icons.Default.FilterList,
             contentDescription = null,
-            tint = SandTextSecondary,
+            tint = colors.textSecondary,
             modifier = Modifier.size(36.dp)
           )
           Spacer(modifier = Modifier.height(8.dp))
           Text(
             text = "No call logs in '${selectedCategory.label}'",
-            color = SandTextPrimary,
+            color = colors.textPrimary,
             fontWeight = FontWeight.Bold,
             fontSize = 14.sp
           )
           Text(
-            text = if (searchQuery.isNotEmpty()) "Try adjusting your search query." else "Tap 'Fetch' to sync latest logs from Supabase.",
-            color = SandTextSecondary,
+            text = if (activeSearchQuery.isNotEmpty() || activeDateFilter != CallDateFilter.ALL) {
+              "Try adjusting your search query or date filter."
+            } else {
+              "Tap 'Fetch' to sync latest logs from Supabase."
+            },
+            color = colors.textSecondary,
             fontSize = 12.sp
           )
         }
@@ -739,24 +763,24 @@ fun SupabaseCallsDashboard(
       onDismissRequest = { inspectingCallForSupabaseJson = null },
       title = {
         Row(verticalAlignment = Alignment.CenterVertically) {
-          Icon(imageVector = Icons.Default.DataObject, contentDescription = null, tint = SurfCyan)
+          Icon(imageVector = Icons.Default.DataObject, contentDescription = null, tint = colors.cyan)
           Spacer(modifier = Modifier.width(8.dp))
-          Text("Supabase Record Payload", color = SandTextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+          Text("Supabase Record Payload", color = colors.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
         }
       },
       text = {
         Column {
           Text(
             text = "Table: public.calls • ID: ${call.id}",
-            color = SeaGreen,
+            color = colors.seaGreen,
             fontSize = 11.sp,
             fontWeight = FontWeight.SemiBold
           )
           Spacer(modifier = Modifier.height(8.dp))
           Surface(
             shape = RoundedCornerShape(8.dp),
-            color = OceanAbyss,
-            border = BorderStroke(1.dp, SurfTeal.copy(alpha = 0.4f)),
+            color = colors.abyss,
+            border = BorderStroke(1.dp, colors.teal.copy(alpha = 0.4f)),
             modifier = Modifier
               .fillMaxWidth()
               .height(260.dp)
@@ -766,7 +790,7 @@ fun SupabaseCallsDashboard(
               text = jsonPayload,
               fontFamily = FontFamily.Monospace,
               fontSize = 10.sp,
-              color = SandTextPrimary,
+              color = colors.textPrimary,
               modifier = Modifier
                 .padding(10.dp)
                 .horizontalScroll(rememberScrollState())
@@ -783,7 +807,7 @@ fun SupabaseCallsDashboard(
             Toast.makeText(context, "Copied Supabase JSON to clipboard", Toast.LENGTH_SHORT).show()
             inspectingCallForSupabaseJson = null
           },
-          colors = ButtonDefaults.buttonColors(containerColor = SurfTeal)
+          colors = ButtonDefaults.buttonColors(containerColor = colors.teal)
         ) {
           Icon(imageVector = Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(14.dp))
           Spacer(modifier = Modifier.width(4.dp))
@@ -792,10 +816,10 @@ fun SupabaseCallsDashboard(
       },
       dismissButton = {
         TextButton(onClick = { inspectingCallForSupabaseJson = null }) {
-          Text("Close", color = SandTextSecondary)
+          Text("Close", color = colors.textSecondary)
         }
       },
-      containerColor = OceanDeepBlue
+      containerColor = colors.deepBlue
     )
   }
 }
@@ -807,9 +831,10 @@ fun KpiMetricCard(
   tint: Color,
   modifier: Modifier = Modifier
 ) {
+  val colors = OceanTheme.colors
   Card(
     shape = RoundedCornerShape(12.dp),
-    colors = CardDefaults.cardColors(containerColor = OceanDeepBlue),
+    colors = CardDefaults.cardColors(containerColor = colors.deepBlue),
     border = BorderStroke(1.dp, tint.copy(alpha = 0.4f)),
     modifier = modifier
   ) {
@@ -826,7 +851,7 @@ fun KpiMetricCard(
       Spacer(modifier = Modifier.height(2.dp))
       Text(
         text = title,
-        color = SandTextSecondary,
+        color = colors.textSecondary,
         fontSize = 10.sp,
         fontWeight = FontWeight.Medium
       )
@@ -845,6 +870,7 @@ fun StaffCallDetailCard(
   onDelete: () -> Unit
 ) {
   val context = LocalContext.current
+  val colors = OceanTheme.colors
   var isExpanded by remember { mutableStateOf(false) }
   val category = remember(call) { categorizeCall(call) }
 
@@ -852,25 +878,25 @@ fun StaffCallDetailCard(
   val isEscalated = call.status == "ESCALATED" || call.isEscalated
 
   val cardBorder = when {
-    isEscalated -> CoralAlert
-    isPending -> SunsetOrange
-    else -> SurfTeal.copy(alpha = 0.4f)
+    isEscalated -> colors.coralAlert
+    isPending -> colors.sunsetOrange
+    else -> colors.teal.copy(alpha = 0.4f)
   }
 
   val categoryPillColor = when (category) {
-    DashboardCategory.LEADS -> SeaGreen
-    DashboardCategory.PURCHASES -> GoldenSun
-    DashboardCategory.BOOKINGS -> SurfTeal
-    DashboardCategory.ENTERPRISE -> SunsetOrange
-    DashboardCategory.AEO -> SurfTurquoise
-    DashboardCategory.SUPPORT -> SeaGreen
-    DashboardCategory.ESCALATED -> CoralAlert
-    else -> SurfCyan
+    DashboardCategory.LEADS -> colors.seaGreen
+    DashboardCategory.PURCHASES -> colors.goldenSun
+    DashboardCategory.BOOKINGS -> colors.teal
+    DashboardCategory.ENTERPRISE -> colors.sunsetOrange
+    DashboardCategory.AEO -> colors.turquoise
+    DashboardCategory.SUPPORT -> colors.seaGreen
+    DashboardCategory.ESCALATED -> colors.coralAlert
+    else -> colors.cyan
   }
 
   Card(
     shape = RoundedCornerShape(16.dp),
-    colors = CardDefaults.cardColors(containerColor = OceanDeepBlue),
+    colors = CardDefaults.cardColors(containerColor = colors.deepBlue),
     border = BorderStroke(1.dp, cardBorder),
     modifier = Modifier
       .fillMaxWidth()
@@ -884,14 +910,14 @@ fun StaffCallDetailCard(
       ) {
         Surface(
           shape = CircleShape,
-          color = if (isEscalated) CoralAlert.copy(alpha = 0.2f) else SurfTeal.copy(alpha = 0.2f),
+          color = if (isEscalated) colors.coralAlert.copy(alpha = 0.2f) else colors.teal.copy(alpha = 0.2f),
           modifier = Modifier.size(42.dp)
         ) {
           Box(contentAlignment = Alignment.Center) {
             Icon(
               imageVector = if (isEscalated) Icons.Default.PriorityHigh else Icons.Default.PhoneInTalk,
               contentDescription = null,
-              tint = if (isEscalated) CoralAlert else SurfCyan,
+              tint = if (isEscalated) colors.coralAlert else colors.cyan,
               modifier = Modifier.size(20.dp)
             )
           }
@@ -903,14 +929,14 @@ fun StaffCallDetailCard(
           Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
               text = call.callerName,
-              color = SandTextPrimary,
+              color = colors.textPrimary,
               fontWeight = FontWeight.Bold,
               fontSize = 15.sp
             )
           }
           Text(
             text = "${call.callerNumber} • ${SimpleDateFormat("MMM d, h:mm a", Locale.getDefault()).format(Date(call.timestamp))} (${call.durationSeconds}s)",
-            color = SandTextSecondary,
+            color = colors.textSecondary,
             fontSize = 11.sp
           )
         }
@@ -938,21 +964,21 @@ fun StaffCallDetailCard(
       // Customer Question / Transcript Snippet
       Surface(
         shape = RoundedCornerShape(10.dp),
-        color = OceanAbyss,
-        border = BorderStroke(1.dp, SurfTeal.copy(alpha = 0.25f)),
+        color = colors.abyss,
+        border = BorderStroke(1.dp, colors.teal.copy(alpha = 0.25f)),
         modifier = Modifier.fillMaxWidth()
       ) {
         Column(modifier = Modifier.padding(10.dp)) {
           Text(
             text = "Caller Question:",
-            color = SurfCyan,
+            color = colors.cyan,
             fontSize = 10.sp,
             fontWeight = FontWeight.Bold
           )
           Spacer(modifier = Modifier.height(2.dp))
           Text(
             text = "\"${call.customerQuestion}\"",
-            color = SandTextPrimary,
+            color = colors.textPrimary,
             fontSize = 12.sp,
             fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
           )
@@ -964,7 +990,7 @@ fun StaffCallDetailCard(
       // AI-Generated Call Summary
       Surface(
         shape = RoundedCornerShape(10.dp),
-        color = OceanCard,
+        color = colors.card,
         modifier = Modifier.fillMaxWidth()
       ) {
         Column(modifier = Modifier.padding(10.dp)) {
@@ -972,13 +998,13 @@ fun StaffCallDetailCard(
             Icon(
               imageVector = Icons.Default.Surfing,
               contentDescription = null,
-              tint = GoldenSun,
+              tint = colors.goldenSun,
               modifier = Modifier.size(16.dp)
             )
             Spacer(modifier = Modifier.width(6.dp))
             Text(
               text = "Kai AI Call Summary",
-              color = GoldenSun,
+              color = colors.goldenSun,
               fontSize = 11.sp,
               fontWeight = FontWeight.Bold
             )
@@ -991,13 +1017,13 @@ fun StaffCallDetailCard(
               },
               modifier = Modifier.size(24.dp)
             ) {
-              Icon(imageVector = Icons.Default.ContentCopy, contentDescription = "Copy Summary", tint = SandTextSecondary, modifier = Modifier.size(14.dp))
+              Icon(imageVector = Icons.Default.ContentCopy, contentDescription = "Copy Summary", tint = colors.textSecondary, modifier = Modifier.size(14.dp))
             }
           }
           Spacer(modifier = Modifier.height(4.dp))
           Text(
             text = call.summary,
-            color = SandTextPrimary,
+            color = colors.textPrimary,
             fontSize = 12.sp,
             lineHeight = 16.sp
           )
@@ -1009,20 +1035,20 @@ fun StaffCallDetailCard(
         Column(modifier = Modifier.padding(top = 8.dp)) {
           Surface(
             shape = RoundedCornerShape(10.dp),
-            color = OceanSurface,
+            color = colors.surface,
             modifier = Modifier.fillMaxWidth()
           ) {
             Column(modifier = Modifier.padding(10.dp)) {
               Text(
                 text = "Full AI Surfer Response Delivered to Caller:",
-                color = SurfTurquoise,
+                color = colors.turquoise,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold
               )
               Spacer(modifier = Modifier.height(4.dp))
               Text(
                 text = call.aiResponse,
-                color = SandTextPrimary,
+                color = colors.textPrimary,
                 fontSize = 12.sp,
                 lineHeight = 16.sp
               )
@@ -1033,13 +1059,13 @@ fun StaffCallDetailCard(
             Spacer(modifier = Modifier.height(6.dp))
             Surface(
               shape = RoundedCornerShape(8.dp),
-              color = CoralAlert.copy(alpha = 0.15f),
-              border = BorderStroke(1.dp, CoralAlert),
+              color = colors.coralAlert.copy(alpha = 0.15f),
+              border = BorderStroke(1.dp, colors.coralAlert),
               modifier = Modifier.fillMaxWidth()
             ) {
               Text(
                 text = "⚠️ Escalation Note: ${call.escalationNotes}",
-                color = SandTextPrimary,
+                color = colors.textPrimary,
                 fontSize = 11.sp,
                 modifier = Modifier.padding(8.dp)
               )
@@ -1054,18 +1080,18 @@ fun StaffCallDetailCard(
           ) {
             Text(
               text = "Status: ${call.status}",
-              color = SandTextSecondary,
+              color = colors.textSecondary,
               fontSize = 11.sp
             )
             TextButton(onClick = onDelete) {
               Icon(
                 imageVector = Icons.Default.DeleteOutline,
                 contentDescription = "Delete Call Log",
-                tint = CoralAlert,
+                tint = colors.coralAlert,
                 modifier = Modifier.size(16.dp)
               )
               Spacer(modifier = Modifier.width(4.dp))
-              Text("Remove Log", color = CoralAlert, fontSize = 11.sp)
+              Text("Remove Log", color = colors.coralAlert, fontSize = 11.sp)
             }
           }
         }
@@ -1083,31 +1109,31 @@ fun StaffCallDetailCard(
         if (isPending || isEscalated) {
           Button(
             onClick = onMarkReviewed,
-            colors = ButtonDefaults.buttonColors(containerColor = SeaGreen),
+            colors = ButtonDefaults.buttonColors(containerColor = colors.seaGreen),
             shape = RoundedCornerShape(8.dp),
             modifier = Modifier.weight(1f)
           ) {
             Icon(imageVector = Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp))
             Spacer(modifier = Modifier.width(3.dp))
-            Text("Review", color = OceanAbyss, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Text("Review", color = colors.abyss, fontSize = 11.sp, fontWeight = FontWeight.Bold)
           }
         } else {
           OutlinedButton(
             onClick = onMarkPending,
             shape = RoundedCornerShape(8.dp),
-            border = BorderStroke(1.dp, SeaGreen),
+            border = BorderStroke(1.dp, colors.seaGreen),
             modifier = Modifier.weight(1f)
           ) {
-            Icon(imageVector = Icons.Default.Check, contentDescription = null, tint = SeaGreen, modifier = Modifier.size(14.dp))
+            Icon(imageVector = Icons.Default.Check, contentDescription = null, tint = colors.seaGreen, modifier = Modifier.size(14.dp))
             Spacer(modifier = Modifier.width(3.dp))
-            Text("Reviewed", color = SeaGreen, fontSize = 11.sp)
+            Text("Reviewed", color = colors.seaGreen, fontSize = 11.sp)
           }
         }
 
         // Trigger Escalation Alert (Push + Email)
         Button(
           onClick = onTriggerEscalation,
-          colors = ButtonDefaults.buttonColors(containerColor = if (isEscalated) CoralAlert.copy(alpha = 0.85f) else SunsetOrange),
+          colors = ButtonDefaults.buttonColors(containerColor = if (isEscalated) colors.coralAlert.copy(alpha = 0.85f) else colors.sunsetOrange),
           shape = RoundedCornerShape(8.dp),
           modifier = Modifier
             .weight(1f)
@@ -1124,7 +1150,7 @@ fun StaffCallDetailCard(
             val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${call.callerNumber}"))
             try { context.startActivity(intent) } catch (_: Exception) {}
           },
-          colors = ButtonDefaults.buttonColors(containerColor = SurfTeal),
+          colors = ButtonDefaults.buttonColors(containerColor = colors.teal),
           shape = RoundedCornerShape(8.dp),
           modifier = Modifier.weight(0.85f)
         ) {
@@ -1143,7 +1169,7 @@ fun StaffCallDetailCard(
           },
           modifier = Modifier.size(34.dp)
         ) {
-          Icon(imageVector = Icons.Default.Email, contentDescription = "Email Escalation Alert", tint = SurfCyan, modifier = Modifier.size(18.dp))
+          Icon(imageVector = Icons.Default.Email, contentDescription = "Email Escalation Alert", tint = colors.cyan, modifier = Modifier.size(18.dp))
         }
 
         // Supabase JSON payload
@@ -1151,7 +1177,7 @@ fun StaffCallDetailCard(
           onClick = onViewSupabaseJson,
           modifier = Modifier.size(34.dp)
         ) {
-          Icon(imageVector = Icons.Default.Code, contentDescription = "Supabase JSON", tint = SurfCyan, modifier = Modifier.size(18.dp))
+          Icon(imageVector = Icons.Default.Code, contentDescription = "Supabase JSON", tint = colors.cyan, modifier = Modifier.size(18.dp))
         }
 
         // Expand / Collapse details
@@ -1162,7 +1188,7 @@ fun StaffCallDetailCard(
           Icon(
             imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
             contentDescription = if (isExpanded) "Less" else "More",
-            tint = SandTextSecondary,
+            tint = colors.textSecondary,
             modifier = Modifier.size(18.dp)
           )
         }

@@ -20,7 +20,10 @@ class AppRepository(private val database: AppDatabase) {
   private val waveAuditLeadDao = database.waveAuditLeadDao()
 
   val allCalls: Flow<List<CallEntity>> = callDao.getAllCalls()
+  val latestCalls: Flow<List<CallEntity>> = callDao.getLatestCalls()
   val pendingCalls: Flow<List<CallEntity>> = callDao.getPendingCalls()
+
+  fun observeLatestCalls(limit: Int = 25): Flow<List<CallEntity>> = callDao.getLatestCalls(limit)
   val allProducts: Flow<List<ProductEntity>> = productDao.getAllProducts()
   val allFaqs: Flow<List<FaqEntity>> = faqDao.getAllFaqs()
   val allLeads: Flow<List<WaveAuditLeadEntity>> = waveAuditLeadDao.getAllLeads()

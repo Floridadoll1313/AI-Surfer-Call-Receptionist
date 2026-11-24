@@ -20,9 +20,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.PhoneInTalk
 import androidx.compose.material.icons.filled.Sell
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Surfing
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -65,14 +65,8 @@ import com.example.ui.screens.ClientHubScreen
 import com.example.ui.screens.IntegrationsScreen
 import com.example.ui.screens.ProductsScreen
 import com.example.ui.screens.ReceptionistScreen
-import com.example.ui.theme.CoralAlert
-import com.example.ui.theme.MyApplicationTheme
-import com.example.ui.theme.OceanAbyss
-import com.example.ui.theme.OceanDeepBlue
-import com.example.ui.theme.SandTextPrimary
-import com.example.ui.theme.SandTextSecondary
-import com.example.ui.theme.SurfCyan
-import com.example.ui.theme.SurfTurquoise
+import com.example.ui.theme.OceanTheme
+import com.example.ui.theme.ThemeProvider
 
 class MainActivity : ComponentActivity() {
 
@@ -92,7 +86,11 @@ class MainActivity : ComponentActivity() {
     val initialTab = if (intent?.getStringExtra("NAVIGATE_TO") == "calls") 1 else 0
 
     setContent {
-      MyApplicationTheme(darkTheme = true) {
+      val selectedPalette by viewModel.selectedPalette.collectAsStateWithLifecycle()
+      ThemeProvider(
+        palette = selectedPalette,
+        onSelectPalette = { palette -> viewModel.selectOceanPalette(palette) }
+      ) {
         OceanSurferMainContent(
           viewModel = viewModel,
           initialTab = initialTab,
@@ -119,6 +117,7 @@ fun OceanSurferMainContent(
   requestedTab: Int? = null,
   onConsumedRequestedTab: () -> Unit = {}
 ) {
+  val colors = OceanTheme.colors
   var selectedTab by rememberSaveable { mutableIntStateOf(initialTab) }
   LaunchedEffect(requestedTab) {
     requestedTab?.let {
@@ -187,7 +186,8 @@ fun OceanSurferMainContent(
     Scaffold(
       modifier = Modifier
         .fillMaxSize()
-        .background(OceanAbyss),
+        .background(colors.abyss),
+      containerColor = colors.abyss,
       topBar = {
         OceanStatusBar(
           isOnline = true,
@@ -209,9 +209,17 @@ fun OceanSurferMainContent(
       snackbarHost = { SnackbarHost(snackbarHostState) },
       bottomBar = {
         NavigationBar(
-          containerColor = OceanDeepBlue,
-          contentColor = SurfCyan
+          containerColor = colors.deepBlue,
+          contentColor = colors.cyan
         ) {
+          val navItemColors = NavigationBarItemDefaults.colors(
+            selectedIconColor = colors.abyss,
+            selectedTextColor = colors.turquoise,
+            indicatorColor = colors.turquoise,
+            unselectedIconColor = colors.textSecondary,
+            unselectedTextColor = colors.textSecondary
+          )
+
           NavigationBarItem(
             selected = selectedTab == 0,
             onClick = { selectedTab = 0 },
@@ -223,13 +231,7 @@ fun OceanSurferMainContent(
               )
             },
             label = { Text("Receptionist", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
-            colors = NavigationBarItemDefaults.colors(
-              selectedIconColor = OceanAbyss,
-              selectedTextColor = SurfTurquoise,
-              indicatorColor = SurfTurquoise,
-              unselectedIconColor = SandTextSecondary,
-              unselectedTextColor = SandTextSecondary
-            ),
+            colors = navItemColors,
             modifier = Modifier.testTag("nav_receptionist")
           )
 
@@ -241,7 +243,7 @@ fun OceanSurferMainContent(
                 badge = {
                   val alertBadgeCount = escalatedCount + pendingCalls.size
                   if (alertBadgeCount > 0) {
-                    Badge(containerColor = CoralAlert, contentColor = Color.White) {
+                    Badge(containerColor = colors.coralAlert, contentColor = Color.White) {
                       Text(alertBadgeCount.toString())
                     }
                   }
@@ -255,13 +257,7 @@ fun OceanSurferMainContent(
               }
             },
             label = { Text("Dashboard", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
-            colors = NavigationBarItemDefaults.colors(
-              selectedIconColor = OceanAbyss,
-              selectedTextColor = SurfTurquoise,
-              indicatorColor = SurfTurquoise,
-              unselectedIconColor = SandTextSecondary,
-              unselectedTextColor = SandTextSecondary
-            ),
+            colors = navItemColors,
             modifier = Modifier.testTag("nav_calls")
           )
 
@@ -276,13 +272,7 @@ fun OceanSurferMainContent(
               )
             },
             label = { Text("Client AI", fontSize = 10.sp, fontWeight = FontWeight.Bold) },
-            colors = NavigationBarItemDefaults.colors(
-              selectedIconColor = OceanAbyss,
-              selectedTextColor = SurfTurquoise,
-              indicatorColor = SurfTurquoise,
-              unselectedIconColor = SandTextSecondary,
-              unselectedTextColor = SandTextSecondary
-            ),
+            colors = navItemColors,
             modifier = Modifier.testTag("nav_client_hub")
           )
 
@@ -297,13 +287,7 @@ fun OceanSurferMainContent(
               )
             },
             label = { Text("Products", fontSize = 10.sp, fontWeight = FontWeight.Bold) },
-            colors = NavigationBarItemDefaults.colors(
-              selectedIconColor = OceanAbyss,
-              selectedTextColor = SurfTurquoise,
-              indicatorColor = SurfTurquoise,
-              unselectedIconColor = SandTextSecondary,
-              unselectedTextColor = SandTextSecondary
-            ),
+            colors = navItemColors,
             modifier = Modifier.testTag("nav_products")
           )
 
@@ -312,19 +296,13 @@ fun OceanSurferMainContent(
             onClick = { selectedTab = 4 },
             icon = {
               Icon(
-                imageVector = Icons.Default.Extension,
-                contentDescription = "Integrations",
+                imageVector = Icons.Default.Settings,
+                contentDescription = "Settings & Integrations",
                 modifier = Modifier.size(24.dp)
               )
             },
-            label = { Text("Integrations", fontSize = 10.sp, fontWeight = FontWeight.Bold) },
-            colors = NavigationBarItemDefaults.colors(
-              selectedIconColor = OceanAbyss,
-              selectedTextColor = SurfTurquoise,
-              indicatorColor = SurfTurquoise,
-              unselectedIconColor = SandTextSecondary,
-              unselectedTextColor = SandTextSecondary
-            ),
+            label = { Text("Settings", fontSize = 10.sp, fontWeight = FontWeight.Bold) },
+            colors = navItemColors,
             modifier = Modifier.testTag("nav_integrations")
           )
         }

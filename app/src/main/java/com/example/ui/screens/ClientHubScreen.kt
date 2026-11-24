@@ -62,18 +62,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ai.GeminiAdvisorUiState
 import com.example.ui.OceanSurferViewModel
 import com.example.ui.components.OceanWaveHeader
-import com.example.ui.theme.CoralAlert
-import com.example.ui.theme.GoldenSun
-import com.example.ui.theme.OceanAbyss
-import com.example.ui.theme.OceanCard
-import com.example.ui.theme.OceanCardSecondary
-import com.example.ui.theme.OceanDeepBlue
-import com.example.ui.theme.SandTextPrimary
-import com.example.ui.theme.SandTextSecondary
-import com.example.ui.theme.SeaGreen
-import com.example.ui.theme.SurfCyan
-import com.example.ui.theme.SurfTeal
-import com.example.ui.theme.SurfTurquoise
+import com.example.ui.theme.OceanTheme
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -82,6 +71,7 @@ fun ClientHubScreen(
   modifier: Modifier = Modifier
 ) {
   val context = LocalContext.current
+  val colors = OceanTheme.colors
   val scrollState = rememberScrollState()
   val advisorState by viewModel.geminiAdvisorState.collectAsStateWithLifecycle()
   val clientLeads by viewModel.clientLeads.collectAsStateWithLifecycle()
@@ -108,7 +98,7 @@ fun ClientHubScreen(
   Column(
     modifier = modifier
       .fillMaxSize()
-      .background(OceanAbyss)
+      .background(colors.abyss)
       .verticalScroll(scrollState)
       .testTag("client_hub_screen")
   ) {
@@ -129,21 +119,21 @@ fun ClientHubScreen(
           .fillMaxWidth()
           .testTag("client_ai_advisor_card"),
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = OceanDeepBlue),
-        border = BorderStroke(1.dp, SurfTurquoise.copy(alpha = 0.5f))
+        colors = CardDefaults.cardColors(containerColor = colors.deepBlue),
+        border = BorderStroke(1.dp, colors.turquoise.copy(alpha = 0.5f))
       ) {
         Column(modifier = Modifier.padding(16.dp)) {
           Row(verticalAlignment = Alignment.CenterVertically) {
             Surface(
               shape = CircleShape,
-              color = SurfTurquoise.copy(alpha = 0.18f),
+              color = colors.turquoise.copy(alpha = 0.18f),
               modifier = Modifier.size(40.dp)
             ) {
               Box(contentAlignment = Alignment.Center) {
                 Icon(
                   imageVector = Icons.Default.AutoAwesome,
                   contentDescription = "Gemini AI Wave Advisor",
-                  tint = SurfTurquoise,
+                  tint = colors.turquoise,
                   modifier = Modifier.size(22.dp)
                 )
               }
@@ -152,13 +142,13 @@ fun ClientHubScreen(
             Column(modifier = Modifier.weight(1f)) {
               Text(
                 text = "Gemini AI Wave Advisor",
-                color = SandTextPrimary,
+                color = colors.textPrimary,
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp
               )
               Text(
                 text = "Powered by Firebase AI Logic (gemini-3.8-flash)",
-                color = SeaGreen,
+                color = colors.seaGreen,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.SemiBold
               )
@@ -169,7 +159,7 @@ fun ClientHubScreen(
 
           Text(
             text = "Primary Growth Bottleneck:",
-            color = SandTextSecondary,
+            color = colors.textSecondary,
             fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold
           )
@@ -185,10 +175,10 @@ fun ClientHubScreen(
                 onClick = { selectedBottleneck = item },
                 label = { Text(item, fontSize = 11.sp) },
                 colors = FilterChipDefaults.filterChipColors(
-                  selectedContainerColor = SurfTurquoise,
-                  selectedLabelColor = OceanAbyss,
-                  containerColor = OceanCard,
-                  labelColor = SandTextPrimary
+                  selectedContainerColor = colors.turquoise,
+                  selectedLabelColor = colors.abyss,
+                  containerColor = colors.card,
+                  labelColor = colors.textPrimary
                 ),
                 modifier = Modifier.testTag("bottleneck_chip_${item.lowercase().replace(' ', '_')}")
               )
@@ -208,10 +198,10 @@ fun ClientHubScreen(
             minLines = 2,
             maxLines = 4,
             colors = OutlinedTextFieldDefaults.colors(
-              focusedBorderColor = SurfTurquoise,
-              unfocusedBorderColor = SurfTeal,
-              focusedTextColor = SandTextPrimary,
-              unfocusedTextColor = SandTextPrimary
+              focusedBorderColor = colors.turquoise,
+              unfocusedBorderColor = colors.teal,
+              focusedTextColor = colors.textPrimary,
+              unfocusedTextColor = colors.textPrimary
             )
           )
 
@@ -219,7 +209,7 @@ fun ClientHubScreen(
 
           Button(
             onClick = { viewModel.askGeminiWaveAdvisor(advisorInput, selectedBottleneck) },
-            colors = ButtonDefaults.buttonColors(containerColor = SurfTurquoise),
+            colors = ButtonDefaults.buttonColors(containerColor = colors.turquoise),
             shape = RoundedCornerShape(10.dp),
             modifier = Modifier
               .fillMaxWidth()
@@ -228,11 +218,11 @@ fun ClientHubScreen(
             Icon(
               imageVector = Icons.AutoMirrored.Filled.Send,
               contentDescription = "Generate AI Plan",
-              tint = OceanAbyss,
+              tint = colors.abyss,
               modifier = Modifier.size(16.dp)
             )
             Spacer(modifier = Modifier.width(8.dp))
-            Text("Generate AI Strategy Plan", color = OceanAbyss, fontWeight = FontWeight.Bold)
+            Text("Generate AI Strategy Plan", color = colors.abyss, fontWeight = FontWeight.Bold)
           }
 
           // Advisor Output State
@@ -245,33 +235,33 @@ fun ClientHubScreen(
               ) {
                 CircularProgressIndicator(
                   modifier = Modifier.size(18.dp),
-                  color = SurfTurquoise,
+                  color = colors.turquoise,
                   strokeWidth = 2.dp
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Analyzing with Gemini 3.8 Flash...", color = SurfCyan, fontSize = 12.sp)
+                Text("Analyzing with Gemini 3.8 Flash...", color = colors.cyan, fontSize = 12.sp)
               }
             }
             is GeminiAdvisorUiState.Streaming -> {
               Surface(
                 shape = RoundedCornerShape(12.dp),
-                color = OceanCard,
+                color = colors.card,
                 modifier = Modifier
                   .fillMaxWidth()
                   .padding(top = 12.dp)
               ) {
                 Column(modifier = Modifier.padding(12.dp)) {
-                  Text("LIVE GEMINI STREAM", color = SurfTurquoise, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                  Text("LIVE GEMINI STREAM", color = colors.turquoise, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                   Spacer(modifier = Modifier.height(4.dp))
-                  Text(state.text, color = SandTextPrimary, fontSize = 13.sp, lineHeight = 19.sp)
+                  Text(state.text, color = colors.textPrimary, fontSize = 13.sp, lineHeight = 19.sp)
                 }
               }
             }
             is GeminiAdvisorUiState.Success -> {
               Surface(
                 shape = RoundedCornerShape(12.dp),
-                color = OceanCard,
-                border = BorderStroke(1.dp, SeaGreen.copy(alpha = 0.6f)),
+                color = colors.card,
+                border = BorderStroke(1.dp, colors.seaGreen.copy(alpha = 0.6f)),
                 modifier = Modifier
                   .fillMaxWidth()
                   .padding(top = 12.dp)
@@ -279,33 +269,33 @@ fun ClientHubScreen(
               ) {
                 Column(modifier = Modifier.padding(12.dp)) {
                   Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = SeaGreen, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = colors.seaGreen, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                       text = "Recommended: ${state.recommendedProduct}",
-                      color = SeaGreen,
+                      color = colors.seaGreen,
                       fontWeight = FontWeight.Bold,
                       fontSize = 12.sp
                     )
                   }
                   Spacer(modifier = Modifier.height(6.dp))
-                  Text(state.text, color = SandTextPrimary, fontSize = 13.sp, lineHeight = 19.sp)
+                  Text(state.text, color = colors.textPrimary, fontSize = 13.sp, lineHeight = 19.sp)
                 }
               }
             }
             is GeminiAdvisorUiState.Error -> {
               Surface(
                 shape = RoundedCornerShape(12.dp),
-                color = CoralAlert.copy(alpha = 0.16f),
-                border = BorderStroke(1.dp, CoralAlert),
+                color = colors.coralAlert.copy(alpha = 0.16f),
+                border = BorderStroke(1.dp, colors.coralAlert),
                 modifier = Modifier
                   .fillMaxWidth()
                   .padding(top = 12.dp)
               ) {
                 Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                  Icon(Icons.Default.Warning, contentDescription = "AI Error", tint = CoralAlert, modifier = Modifier.size(18.dp))
+                  Icon(Icons.Default.Warning, contentDescription = "AI Error", tint = colors.coralAlert, modifier = Modifier.size(18.dp))
                   Spacer(modifier = Modifier.width(8.dp))
-                  Text(state.message, color = SandTextPrimary, fontSize = 12.sp)
+                  Text(state.message, color = colors.textPrimary, fontSize = 12.sp)
                 }
               }
             }
@@ -319,23 +309,23 @@ fun ClientHubScreen(
           .fillMaxWidth()
           .testTag("client_wave_check_card"),
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = OceanDeepBlue),
-        border = BorderStroke(1.dp, SurfTeal.copy(alpha = 0.5f))
+        colors = CardDefaults.cardColors(containerColor = colors.deepBlue),
+        border = BorderStroke(1.dp, colors.teal.copy(alpha = 0.5f))
       ) {
         Column(modifier = Modifier.padding(16.dp)) {
           Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.Surfing, contentDescription = null, tint = GoldenSun, modifier = Modifier.size(22.dp))
+            Icon(Icons.Default.Surfing, contentDescription = null, tint = colors.goldenSun, modifier = Modifier.size(22.dp))
             Spacer(modifier = Modifier.width(8.dp))
             Column {
               Text(
                 text = "Free AI Wave Check™ Client Intake",
-                color = SandTextPrimary,
+                color = colors.textPrimary,
                 fontWeight = FontWeight.Bold,
                 fontSize = 15.sp
               )
               Text(
                 text = "Syncs directly to Supabase wave_audit_leads & Call Queue",
-                color = SurfCyan,
+                color = colors.cyan,
                 fontSize = 11.sp
               )
             }
@@ -350,10 +340,10 @@ fun ClientHubScreen(
             singleLine = true,
             modifier = Modifier.fillMaxWidth().testTag("client_business_input"),
             colors = OutlinedTextFieldDefaults.colors(
-              focusedBorderColor = SurfTurquoise,
-              unfocusedBorderColor = SurfTeal,
-              focusedTextColor = SandTextPrimary,
-              unfocusedTextColor = SandTextPrimary
+              focusedBorderColor = colors.turquoise,
+              unfocusedBorderColor = colors.teal,
+              focusedTextColor = colors.textPrimary,
+              unfocusedTextColor = colors.textPrimary
             )
           )
           Spacer(modifier = Modifier.height(8.dp))
@@ -366,10 +356,10 @@ fun ClientHubScreen(
               singleLine = true,
               modifier = Modifier.weight(1f).testTag("client_name_input"),
               colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = SurfTurquoise,
-                unfocusedBorderColor = SurfTeal,
-                focusedTextColor = SandTextPrimary,
-                unfocusedTextColor = SandTextPrimary
+                focusedBorderColor = colors.turquoise,
+                unfocusedBorderColor = colors.teal,
+                focusedTextColor = colors.textPrimary,
+                unfocusedTextColor = colors.textPrimary
               )
             )
             OutlinedTextField(
@@ -379,10 +369,10 @@ fun ClientHubScreen(
               singleLine = true,
               modifier = Modifier.weight(1f).testTag("client_phone_input"),
               colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = SurfTurquoise,
-                unfocusedBorderColor = SurfTeal,
-                focusedTextColor = SandTextPrimary,
-                unfocusedTextColor = SandTextPrimary
+                focusedBorderColor = colors.turquoise,
+                unfocusedBorderColor = colors.teal,
+                focusedTextColor = colors.textPrimary,
+                unfocusedTextColor = colors.textPrimary
               )
             )
           }
@@ -395,10 +385,10 @@ fun ClientHubScreen(
             singleLine = true,
             modifier = Modifier.fillMaxWidth().testTag("client_email_input"),
             colors = OutlinedTextFieldDefaults.colors(
-              focusedBorderColor = SurfTurquoise,
-              unfocusedBorderColor = SurfTeal,
-              focusedTextColor = SandTextPrimary,
-              unfocusedTextColor = SandTextPrimary
+              focusedBorderColor = colors.turquoise,
+              unfocusedBorderColor = colors.teal,
+              focusedTextColor = colors.textPrimary,
+              unfocusedTextColor = colors.textPrimary
             )
           )
 
@@ -418,13 +408,13 @@ fun ClientHubScreen(
                 viewModel.showSnackbar("Please enter your work email to submit Wave Check.")
               }
             },
-            colors = ButtonDefaults.buttonColors(containerColor = SeaGreen),
+            colors = ButtonDefaults.buttonColors(containerColor = colors.seaGreen),
             shape = RoundedCornerShape(10.dp),
             modifier = Modifier.fillMaxWidth().testTag("submit_wave_check_button")
           ) {
-            Icon(Icons.Default.CloudDone, contentDescription = null, tint = OceanAbyss, modifier = Modifier.size(16.dp))
+            Icon(Icons.Default.CloudDone, contentDescription = null, tint = colors.abyss, modifier = Modifier.size(16.dp))
             Spacer(modifier = Modifier.width(8.dp))
-            Text("Submit Wave Check to Supabase", color = OceanAbyss, fontWeight = FontWeight.Bold)
+            Text("Submit Wave Check to Supabase", color = colors.abyss, fontWeight = FontWeight.Bold)
           }
 
           AnimatedVisibility(visible = clientLeads.isNotEmpty()) {
@@ -432,24 +422,24 @@ fun ClientHubScreen(
               modifier = Modifier.padding(top = 12.dp),
               verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-              Text("Submitted Client Wave Checks (${clientLeads.size})", color = GoldenSun, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+              Text("Submitted Client Wave Checks (${clientLeads.size})", color = colors.goldenSun, fontWeight = FontWeight.Bold, fontSize = 12.sp)
               clientLeads.take(3).forEach { lead ->
                 Surface(
                   shape = RoundedCornerShape(10.dp),
-                  color = OceanCard,
+                  color = colors.card,
                   modifier = Modifier.fillMaxWidth()
                 ) {
                   Column(modifier = Modifier.padding(10.dp)) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                      Text("${lead.contactName} • ${lead.businessName}", color = SandTextPrimary, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                      Text("${lead.contactName} • ${lead.businessName}", color = colors.textPrimary, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                       Text(
                         text = if (lead.syncedToSupabase) "SUPABASE SYNCED" else "QUEUED",
-                        color = if (lead.syncedToSupabase) SeaGreen else GoldenSun,
+                        color = if (lead.syncedToSupabase) colors.seaGreen else colors.goldenSun,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold
                       )
                     }
-                    Text("Recommended: ${lead.recommendedProduct}", color = SurfCyan, fontSize = 11.sp)
+                    Text("Recommended: ${lead.recommendedProduct}", color = colors.cyan, fontSize = 11.sp)
                   }
                 }
               }
@@ -462,10 +452,10 @@ fun ClientHubScreen(
       Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = OceanCardSecondary)
+        colors = CardDefaults.cardColors(containerColor = colors.cardSecondary)
       ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-          Text("Quick Client Actions", color = SandTextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+          Text("Quick Client Actions", color = colors.textPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
           Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(
               onClick = {
@@ -473,13 +463,13 @@ fun ClientHubScreen(
                   context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://calendly.com/oceantidedrop/new-meeting")))
                 } catch (_: Exception) {}
               },
-              border = BorderStroke(1.dp, SurfTurquoise),
+              border = BorderStroke(1.dp, colors.turquoise),
               shape = RoundedCornerShape(10.dp),
               modifier = Modifier.weight(1f).testTag("client_calendly_button")
             ) {
-              Icon(Icons.Default.CalendarMonth, contentDescription = "Book Strategy Call", tint = SurfTurquoise, modifier = Modifier.size(16.dp))
+              Icon(Icons.Default.CalendarMonth, contentDescription = "Book Strategy Call", tint = colors.turquoise, modifier = Modifier.size(16.dp))
               Spacer(modifier = Modifier.width(6.dp))
-              Text("Book Call", color = SurfTurquoise, fontSize = 12.sp)
+              Text("Book Call", color = colors.turquoise, fontSize = 12.sp)
             }
             Button(
               onClick = {
@@ -487,13 +477,13 @@ fun ClientHubScreen(
                   context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://buy.stripe.com/aFa8wP7JN3500Uy1tt4gg0b")))
                 } catch (_: Exception) {}
               },
-              colors = ButtonDefaults.buttonColors(containerColor = GoldenSun),
+              colors = ButtonDefaults.buttonColors(containerColor = colors.goldenSun),
               shape = RoundedCornerShape(10.dp),
               modifier = Modifier.weight(1f).testTag("client_stripe_button")
             ) {
-              Icon(Icons.Default.CreditCard, contentDescription = "Wave Starter Checkout", tint = OceanAbyss, modifier = Modifier.size(16.dp))
+              Icon(Icons.Default.CreditCard, contentDescription = "Wave Starter Checkout", tint = colors.abyss, modifier = Modifier.size(16.dp))
               Spacer(modifier = Modifier.width(6.dp))
-              Text("$497 Sprint", color = OceanAbyss, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+              Text("$497 Sprint", color = colors.abyss, fontWeight = FontWeight.Bold, fontSize = 12.sp)
             }
           }
           OutlinedButton(
@@ -502,13 +492,13 @@ fun ClientHubScreen(
                 context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://otdaisurfer.surf")))
               } catch (_: Exception) {}
             },
-            border = BorderStroke(1.dp, SurfCyan),
+            border = BorderStroke(1.dp, colors.cyan),
             shape = RoundedCornerShape(10.dp),
             modifier = Modifier.fillMaxWidth().testTag("client_open_website_button")
           ) {
-            Icon(Icons.Default.OpenInBrowser, contentDescription = "Open otdaisurfer.surf", tint = SurfCyan, modifier = Modifier.size(16.dp))
+            Icon(Icons.Default.OpenInBrowser, contentDescription = "Open otdaisurfer.surf", tint = colors.cyan, modifier = Modifier.size(16.dp))
             Spacer(modifier = Modifier.width(6.dp))
-            Text("Visit https://otdaisurfer.surf", color = SurfCyan, fontSize = 12.sp)
+            Text("Visit https://otdaisurfer.surf", color = colors.cyan, fontSize = 12.sp)
           }
         }
       }

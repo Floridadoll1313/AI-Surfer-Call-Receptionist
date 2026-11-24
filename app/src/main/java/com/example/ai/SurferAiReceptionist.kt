@@ -48,7 +48,8 @@ You must answer ALL business questions and ALL product questions thoroughly and 
       faqs = faqs,
       openAiApiKey = config?.apiKey,
       modelName = config?.model ?: "gpt-4o-mini",
-      returningContext = returningContext
+      returningContext = returningContext,
+      useOpenAi = config?.isEnabled ?: true
     )
   }
 
@@ -60,11 +61,15 @@ You must answer ALL business questions and ALL product questions thoroughly and 
     faqs: List<FaqEntity>,
     openAiApiKey: String? = null,
     modelName: String = "gpt-4o-mini",
-    returningContext: String = ""
+    returningContext: String = "",
+    useOpenAi: Boolean = true
   ): ReceptionistResult {
-    // 1. Try ChatGPT if configured via AI Studio Secrets (BuildConfig.OPENAI_API_KEY) or config override
-    val effectiveOpenAiKey = openAiApiKey?.takeIf { it.isNotBlank() }
-      ?: OpenAiClient.configuredBuildConfigKey()
+    // 1. Try ChatGPT if enabled and configured via override or AI Studio Secrets (BuildConfig.OPENAI_API_KEY)
+    val effectiveOpenAiKey = if (!useOpenAi) {
+      null
+    } else {
+      openAiApiKey?.takeIf { it.isNotBlank() } ?: OpenAiClient.configuredBuildConfigKey()
+    }
     if (!effectiveOpenAiKey.isNullOrBlank() && effectiveOpenAiKey.startsWith("sk-")) {
       try {
         val productContext = products.joinToString("\n") {

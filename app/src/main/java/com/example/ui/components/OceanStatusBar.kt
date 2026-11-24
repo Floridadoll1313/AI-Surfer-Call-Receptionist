@@ -59,19 +59,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.theme.CoralAlert
-import com.example.ui.theme.GoldenSun
-import com.example.ui.theme.OceanAbyss
-import com.example.ui.theme.OceanCard
-import com.example.ui.theme.OceanCardSecondary
-import com.example.ui.theme.OceanDeepBlue
-import com.example.ui.theme.SandTextPrimary
-import com.example.ui.theme.SandTextSecondary
-import com.example.ui.theme.SeaGreen
-import com.example.ui.theme.SunsetOrange
-import com.example.ui.theme.SurfCyan
-import com.example.ui.theme.SurfTeal
-import com.example.ui.theme.SurfTurquoise
+import com.example.ui.theme.OceanTheme
 
 @Composable
 fun OceanStatusBar(
@@ -86,12 +74,13 @@ fun OceanStatusBar(
   modifier: Modifier = Modifier
 ) {
   var isExpanded by remember { mutableStateOf(false) }
+  val colors = OceanTheme.colors
 
   // Pulsing animation for the green live indicator & alert indicator
   val infiniteTransition = rememberInfiniteTransition(label = "status_pulse")
   val pulseColor by infiniteTransition.animateColor(
-    initialValue = SeaGreen,
-    targetValue = SeaGreen.copy(alpha = 0.3f),
+    initialValue = colors.seaGreen,
+    targetValue = colors.seaGreen.copy(alpha = 0.3f),
     animationSpec = infiniteRepeatable(
       animation = tween(1200, easing = FastOutSlowInEasing),
       repeatMode = RepeatMode.Reverse
@@ -100,8 +89,8 @@ fun OceanStatusBar(
   )
 
   val alertPulseColor by infiniteTransition.animateColor(
-    initialValue = CoralAlert,
-    targetValue = CoralAlert.copy(alpha = 0.4f),
+    initialValue = colors.coralAlert,
+    targetValue = colors.coralAlert.copy(alpha = 0.4f),
     animationSpec = infiniteRepeatable(
       animation = tween(800, easing = FastOutSlowInEasing),
       repeatMode = RepeatMode.Reverse
@@ -114,7 +103,7 @@ fun OceanStatusBar(
       .fillMaxWidth()
       .background(
         Brush.verticalGradient(
-          colors = listOf(OceanAbyss, OceanDeepBlue)
+          colors = listOf(colors.abyss, colors.deepBlue)
         )
       )
       .statusBarsPadding()
@@ -138,14 +127,14 @@ fun OceanStatusBar(
           modifier = Modifier
             .size(10.dp)
             .clip(CircleShape)
-            .background(if (isOnline) pulseColor else SandTextSecondary)
+            .background(if (isOnline) pulseColor else colors.textSecondary)
         )
 
         Spacer(modifier = Modifier.width(6.dp))
 
         Text(
           text = if (isOnline) "24/7 AI RECEPTIONIST" else "STANDBY",
-          color = if (isOnline) SeaGreen else SandTextSecondary,
+          color = if (isOnline) colors.seaGreen else colors.textSecondary,
           fontSize = 11.sp,
           fontWeight = FontWeight.ExtraBold,
           letterSpacing = 0.5.sp
@@ -155,8 +144,8 @@ fun OceanStatusBar(
 
         Surface(
           shape = RoundedCornerShape(4.dp),
-          color = SurfTeal.copy(alpha = 0.2f),
-          border = BorderStroke(1.dp, SurfTeal.copy(alpha = 0.4f))
+          color = colors.teal.copy(alpha = 0.2f),
+          border = BorderStroke(1.dp, colors.teal.copy(alpha = 0.4f))
         ) {
           Row(
             modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
@@ -165,13 +154,13 @@ fun OceanStatusBar(
             Icon(
               imageVector = Icons.Default.CellTower,
               contentDescription = null,
-              tint = SurfCyan,
+              tint = colors.cyan,
               modifier = Modifier.size(10.dp)
             )
             Spacer(modifier = Modifier.width(3.dp))
             Text(
               text = "CELL GUARD",
-              color = SurfCyan,
+              color = colors.cyan,
               fontSize = 9.sp,
               fontWeight = FontWeight.Bold
             )
@@ -186,7 +175,7 @@ fun OceanStatusBar(
         Surface(
           shape = RoundedCornerShape(12.dp),
           color = alertPulseColor,
-          border = BorderStroke(1.dp, CoralAlert),
+          border = BorderStroke(1.dp, colors.coralAlert),
           modifier = Modifier
             .clickable(onClick = onOpenAlerts)
             .testTag("status_bar_alert_pill")
@@ -213,8 +202,8 @@ fun OceanStatusBar(
       } else {
         Surface(
           shape = RoundedCornerShape(12.dp),
-          color = OceanCard,
-          border = BorderStroke(1.dp, SurfTeal.copy(alpha = 0.3f)),
+          color = colors.card,
+          border = BorderStroke(1.dp, colors.teal.copy(alpha = 0.3f)),
           modifier = Modifier.clickable { isExpanded = !isExpanded }
         ) {
           Row(
@@ -224,13 +213,13 @@ fun OceanStatusBar(
             Icon(
               imageVector = Icons.Default.Security,
               contentDescription = null,
-              tint = SeaGreen,
+              tint = colors.seaGreen,
               modifier = Modifier.size(11.dp)
             )
             Spacer(modifier = Modifier.width(4.dp))
             Text(
               text = if (pendingCount > 0) "$pendingCount In Queue" else "Queue Clear",
-              color = if (pendingCount > 0) SunsetOrange else SeaGreen,
+              color = if (pendingCount > 0) colors.sunsetOrange else colors.seaGreen,
               fontSize = 10.sp,
               fontWeight = FontWeight.Bold
             )
@@ -248,7 +237,7 @@ fun OceanStatusBar(
         Icon(
           imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
           contentDescription = "Expand Status Details",
-          tint = SandTextSecondary,
+          tint = colors.textSecondary,
           modifier = Modifier.size(16.dp)
         )
       }
@@ -263,7 +252,7 @@ fun OceanStatusBar(
       Column(
         modifier = Modifier
           .fillMaxWidth()
-          .background(OceanDeepBlue)
+          .background(colors.deepBlue)
           .padding(horizontal = 14.dp, vertical = 8.dp)
       ) {
         // Detailed metrics strip
@@ -274,21 +263,21 @@ fun OceanStatusBar(
           StatusBarMetricPill(
             label = "Pending SLA",
             value = "$pendingCount Calls",
-            color = SunsetOrange,
+            color = colors.sunsetOrange,
             icon = Icons.Default.HourglassTop,
             modifier = Modifier.weight(1f)
           )
           StatusBarMetricPill(
             label = "Escalated",
             value = "$escalatedCount Alerts",
-            color = if (escalatedCount > 0) CoralAlert else SeaGreen,
+            color = if (escalatedCount > 0) colors.coralAlert else colors.seaGreen,
             icon = Icons.Default.Warning,
             modifier = Modifier.weight(1f)
           )
           StatusBarMetricPill(
             label = "Reviewed",
             value = "$reviewedCount Closed",
-            color = SeaGreen,
+            color = colors.seaGreen,
             icon = Icons.Default.CloudDone,
             modifier = Modifier.weight(1f)
           )
@@ -304,13 +293,13 @@ fun OceanStatusBar(
           Icon(
             imageVector = Icons.Default.Email,
             contentDescription = null,
-            tint = SurfCyan,
+            tint = colors.cyan,
             modifier = Modifier.size(13.dp)
           )
           Spacer(modifier = Modifier.width(6.dp))
           Text(
             text = "Trigger ($triggerChannelLabel) -> $targetEmail",
-            color = SandTextSecondary,
+            color = colors.textSecondary,
             fontSize = 10.sp,
             modifier = Modifier.weight(1f)
           )
@@ -319,7 +308,7 @@ fun OceanStatusBar(
 
           Button(
             onClick = onTriggerTestAlert,
-            colors = ButtonDefaults.buttonColors(containerColor = CoralAlert),
+            colors = ButtonDefaults.buttonColors(containerColor = colors.coralAlert),
             shape = RoundedCornerShape(8.dp),
             modifier = Modifier
               .height(30.dp)
@@ -342,7 +331,7 @@ fun OceanStatusBar(
       modifier = Modifier
         .fillMaxWidth()
         .height(1.dp)
-        .background(SurfTeal.copy(alpha = 0.35f))
+        .background(colors.teal.copy(alpha = 0.35f))
     )
   }
 }
@@ -355,9 +344,10 @@ private fun StatusBarMetricPill(
   icon: androidx.compose.ui.graphics.vector.ImageVector,
   modifier: Modifier = Modifier
 ) {
+  val colors = OceanTheme.colors
   Surface(
     shape = RoundedCornerShape(8.dp),
-    color = OceanCard,
+    color = colors.card,
     border = BorderStroke(1.dp, color.copy(alpha = 0.3f)),
     modifier = modifier
   ) {
@@ -381,7 +371,7 @@ private fun StatusBarMetricPill(
         )
         Text(
           text = label,
-          color = SandTextSecondary,
+          color = colors.textSecondary,
           fontSize = 9.sp
         )
       }

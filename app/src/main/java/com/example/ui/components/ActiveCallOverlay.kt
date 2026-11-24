@@ -63,18 +63,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.example.ui.ActiveCallUiState
-import com.example.ui.theme.CoralAlert
-import com.example.ui.theme.GoldenSun
-import com.example.ui.theme.OceanAbyss
-import com.example.ui.theme.OceanCard
-import com.example.ui.theme.OceanCardSecondary
-import com.example.ui.theme.OceanDeepBlue
-import com.example.ui.theme.SandTextPrimary
-import com.example.ui.theme.SandTextSecondary
-import com.example.ui.theme.SeaGreen
-import com.example.ui.theme.SurfCyan
-import com.example.ui.theme.SurfTeal
-import com.example.ui.theme.SurfTurquoise
+import com.example.ui.theme.OceanTheme
 import com.example.voice.VoiceUiState
 
 @Composable
@@ -92,6 +81,7 @@ fun ActiveCallOverlay(
   if (!activeCall.isRinging && !activeCall.isInCall) return
 
   val context = LocalContext.current
+  val colors = OceanTheme.colors
   var customQueryInput by remember { mutableStateOf("") }
   var micPermissionDenied by remember { mutableStateOf(false) }
   val scrollState = rememberScrollState()
@@ -110,7 +100,7 @@ fun ActiveCallOverlay(
   Box(
     modifier = modifier
       .fillMaxSize()
-      .background(OceanAbyss.copy(alpha = 0.94f))
+      .background(colors.abyss.copy(alpha = 0.94f))
       .padding(16.dp),
     contentAlignment = Alignment.Center
   ) {
@@ -120,8 +110,8 @@ fun ActiveCallOverlay(
         .verticalScroll(scrollState)
         .testTag("active_call_card"),
       shape = RoundedCornerShape(24.dp),
-      colors = CardDefaults.cardColors(containerColor = OceanDeepBlue),
-      border = androidx.compose.foundation.BorderStroke(2.dp, SurfTurquoise.copy(alpha = 0.6f))
+      colors = CardDefaults.cardColors(containerColor = colors.deepBlue),
+      border = androidx.compose.foundation.BorderStroke(2.dp, colors.turquoise.copy(alpha = 0.6f))
     ) {
       Column(
         modifier = Modifier
@@ -132,15 +122,15 @@ fun ActiveCallOverlay(
         // Surfer Avatar & Status Icon
         Surface(
           shape = CircleShape,
-          color = SurfTeal.copy(alpha = 0.3f),
+          color = colors.teal.copy(alpha = 0.3f),
           modifier = Modifier.size(80.dp),
-          border = androidx.compose.foundation.BorderStroke(2.dp, SurfTurquoise)
+          border = androidx.compose.foundation.BorderStroke(2.dp, colors.turquoise)
         ) {
           Box(contentAlignment = Alignment.Center) {
             Icon(
               imageVector = Icons.Default.Surfing,
               contentDescription = "AI Receptionist Surfer",
-              tint = SurfTurquoise,
+              tint = colors.turquoise,
               modifier = Modifier.size(44.dp)
             )
           }
@@ -151,7 +141,7 @@ fun ActiveCallOverlay(
         Text(
           text = if (activeCall.isRinging) "🌊 Incoming Cell Call..." else "🌊 AI Receptionist Active",
           style = MaterialTheme.typography.labelLarge,
-          color = GoldenSun,
+          color = colors.goldenSun,
           fontWeight = FontWeight.Bold
         )
 
@@ -159,21 +149,21 @@ fun ActiveCallOverlay(
           text = activeCall.callerName.ifBlank { "Ocean Swell Caller" },
           style = MaterialTheme.typography.titleLarge,
           fontWeight = FontWeight.ExtraBold,
-          color = SandTextPrimary
+          color = colors.textPrimary
         )
 
         Text(
           text = activeCall.callerNumber.ifBlank { "+1 (555) 789-WAVE" },
           style = MaterialTheme.typography.bodyMedium,
-          color = SandTextSecondary
+          color = colors.textSecondary
         )
 
         if (activeCall.returningContextBadge.isNotBlank()) {
           Spacer(modifier = Modifier.height(6.dp))
           Surface(
             shape = RoundedCornerShape(8.dp),
-            color = GoldenSun.copy(alpha = 0.18f),
-            border = androidx.compose.foundation.BorderStroke(1.dp, GoldenSun),
+            color = colors.goldenSun.copy(alpha = 0.18f),
+            border = androidx.compose.foundation.BorderStroke(1.dp, colors.goldenSun),
             modifier = Modifier.testTag("returning_caller_badge")
           ) {
             Row(
@@ -183,13 +173,13 @@ fun ActiveCallOverlay(
               Icon(
                 imageVector = Icons.Default.Verified,
                 contentDescription = "Returning Caller Profile",
-                tint = GoldenSun,
+                tint = colors.goldenSun,
                 modifier = Modifier.size(14.dp)
               )
               Spacer(modifier = Modifier.width(6.dp))
               Text(
                 text = activeCall.returningContextBadge,
-                color = GoldenSun,
+                color = colors.goldenSun,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold
               )
@@ -207,7 +197,7 @@ fun ActiveCallOverlay(
             Text(
               text = "Duration: %02d:%02d".format(minutes, seconds),
               style = MaterialTheme.typography.bodySmall,
-              color = SurfCyan,
+              color = colors.cyan,
               fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.width(8.dp))
@@ -228,7 +218,7 @@ fun ActiveCallOverlay(
                 } else {
                   "Unmute Kai voice reply"
                 },
-                tint = if (voiceUiState.isSpeaking) GoldenSun else if (voiceUiState.isVoiceOutputEnabled) SeaGreen else SandTextSecondary
+                tint = if (voiceUiState.isSpeaking) colors.goldenSun else if (voiceUiState.isVoiceOutputEnabled) colors.seaGreen else colors.textSecondary
               )
             }
           }
@@ -247,7 +237,7 @@ fun ActiveCallOverlay(
           Text(
             text = "Ocean Tide Drop AI Receptionist is ready to intercept and answer caller questions automatically.",
             style = MaterialTheme.typography.bodySmall,
-            color = SandTextSecondary,
+            color = colors.textSecondary,
             modifier = Modifier.padding(horizontal = 8.dp)
           )
 
@@ -259,7 +249,7 @@ fun ActiveCallOverlay(
           ) {
             Button(
               onClick = onEndCall,
-              colors = ButtonDefaults.buttonColors(containerColor = CoralAlert),
+              colors = ButtonDefaults.buttonColors(containerColor = colors.coralAlert),
               shape = RoundedCornerShape(14.dp),
               modifier = Modifier.testTag("decline_call_button")
             ) {
@@ -270,13 +260,13 @@ fun ActiveCallOverlay(
 
             Button(
               onClick = onAnswer,
-              colors = ButtonDefaults.buttonColors(containerColor = SeaGreen),
+              colors = ButtonDefaults.buttonColors(containerColor = colors.seaGreen),
               shape = RoundedCornerShape(14.dp),
               modifier = Modifier.testTag("answer_call_button")
             ) {
               Icon(imageVector = Icons.Default.Call, contentDescription = "Answer")
               Spacer(modifier = Modifier.width(6.dp))
-              Text("Answer with AI", color = OceanAbyss, fontWeight = FontWeight.Bold)
+              Text("Answer with AI", color = colors.abyss, fontWeight = FontWeight.Bold)
             }
           }
         } else if (activeCall.isInCall) {
@@ -284,24 +274,24 @@ fun ActiveCallOverlay(
           Column(
             modifier = Modifier
               .fillMaxWidth()
-              .background(OceanCard, RoundedCornerShape(16.dp))
+              .background(colors.card, RoundedCornerShape(16.dp))
               .padding(14.dp)
           ) {
             Text(
               text = "🗣️ Caller Inquired:",
               style = MaterialTheme.typography.labelMedium,
-              color = GoldenSun,
+              color = colors.goldenSun,
               fontWeight = FontWeight.Bold
             )
             Text(
               text = activeCall.currentCustomerQuery.ifBlank { "Connecting..." },
               style = MaterialTheme.typography.bodyMedium,
-              color = SandTextPrimary,
+              color = colors.textPrimary,
               modifier = Modifier.padding(top = 2.dp, bottom = 10.dp)
             )
 
             androidx.compose.material3.HorizontalDivider(
-              color = SurfTeal.copy(alpha = 0.3f),
+              color = colors.teal.copy(alpha = 0.3f),
               modifier = Modifier.padding(vertical = 4.dp)
             )
 
@@ -309,14 +299,14 @@ fun ActiveCallOverlay(
               Text(
                 text = "🏄‍♂️ Kai (AI Receptionist):",
                 style = MaterialTheme.typography.labelMedium,
-                color = SurfTurquoise,
+                color = colors.turquoise,
                 fontWeight = FontWeight.Bold
               )
               if (activeCall.isAiThinking) {
                 Spacer(modifier = Modifier.width(8.dp))
                 CircularProgressIndicator(
                   modifier = Modifier.size(14.dp),
-                  color = SurfTurquoise,
+                  color = colors.turquoise,
                   strokeWidth = 2.dp
                 )
               }
@@ -325,7 +315,7 @@ fun ActiveCallOverlay(
             Text(
               text = if (activeCall.isAiThinking) "Formulating ocean response..." else activeCall.currentAiResponse,
               style = MaterialTheme.typography.bodyMedium,
-              color = SandTextPrimary,
+              color = colors.textPrimary,
               modifier = Modifier.padding(top = 4.dp)
             )
 
@@ -333,8 +323,8 @@ fun ActiveCallOverlay(
               Spacer(modifier = Modifier.height(10.dp))
               Surface(
                 shape = RoundedCornerShape(10.dp),
-                color = CoralAlert.copy(alpha = 0.18f),
-                border = androidx.compose.foundation.BorderStroke(1.dp, CoralAlert),
+                color = colors.coralAlert.copy(alpha = 0.18f),
+                border = androidx.compose.foundation.BorderStroke(1.dp, colors.coralAlert),
                 modifier = Modifier
                   .fillMaxWidth()
                   .testTag("active_call_escalation_flag")
@@ -346,20 +336,20 @@ fun ActiveCallOverlay(
                   Icon(
                     imageVector = Icons.Default.Warning,
                     contentDescription = "Escalation Flagged",
-                    tint = CoralAlert,
+                    tint = colors.coralAlert,
                     modifier = Modifier.size(18.dp)
                   )
                   Spacer(modifier = Modifier.width(8.dp))
                   Column(modifier = Modifier.weight(1f)) {
                     Text(
                       text = "🚨 AI FLAGGED FOR ESCALATION",
-                      color = CoralAlert,
+                      color = colors.coralAlert,
                       fontSize = 11.sp,
                       fontWeight = FontWeight.ExtraBold
                     )
                     Text(
                       text = activeCall.escalationReason.ifBlank { "Alert will dispatch automatically via configured Email/Notification trigger on hang-up." },
-                      color = SandTextPrimary,
+                      color = colors.textPrimary,
                       fontSize = 10.sp
                     )
                   }
@@ -374,7 +364,7 @@ fun ActiveCallOverlay(
           Text(
             text = "Ask Receptionist Live on Call:",
             style = MaterialTheme.typography.labelSmall,
-            color = SandTextSecondary,
+            color = colors.textSecondary,
             modifier = Modifier.align(Alignment.Start)
           )
 
@@ -386,19 +376,19 @@ fun ActiveCallOverlay(
           ) {
             Button(
               onClick = { onSendQuery("What is included in the Free AI Wave Check audit?") },
-              colors = ButtonDefaults.buttonColors(containerColor = OceanCardSecondary),
+              colors = ButtonDefaults.buttonColors(containerColor = colors.cardSecondary),
               shape = RoundedCornerShape(10.dp),
               modifier = Modifier.weight(1f)
             ) {
-              Text("Free Wave Check", fontSize = 11.sp, color = SurfCyan)
+              Text("Free Wave Check", fontSize = 11.sp, color = colors.cyan)
             }
             Button(
               onClick = { onSendQuery("How do I buy the $497 Wave Starter Sprint via Stripe?") },
-              colors = ButtonDefaults.buttonColors(containerColor = OceanCardSecondary),
+              colors = ButtonDefaults.buttonColors(containerColor = colors.cardSecondary),
               shape = RoundedCornerShape(10.dp),
               modifier = Modifier.weight(1f)
             ) {
-              Text("Wave Starter", fontSize = 11.sp, color = SurfCyan)
+              Text("Wave Starter", fontSize = 11.sp, color = colors.cyan)
             }
           }
 
@@ -410,19 +400,19 @@ fun ActiveCallOverlay(
           ) {
             Button(
               onClick = { onSendQuery("Tell me about Big Kahuna multi-agent enterprise AI transformation.") },
-              colors = ButtonDefaults.buttonColors(containerColor = OceanCardSecondary),
+              colors = ButtonDefaults.buttonColors(containerColor = colors.cardSecondary),
               shape = RoundedCornerShape(10.dp),
               modifier = Modifier.weight(1f)
             ) {
-              Text("Big Kahuna VIP", fontSize = 11.sp, color = GoldenSun)
+              Text("Big Kahuna VIP", fontSize = 11.sp, color = colors.goldenSun)
             }
             Button(
               onClick = { onSendQuery("How can I book a strategy call on Calendly?") },
-              colors = ButtonDefaults.buttonColors(containerColor = OceanCardSecondary),
+              colors = ButtonDefaults.buttonColors(containerColor = colors.cardSecondary),
               shape = RoundedCornerShape(10.dp),
               modifier = Modifier.weight(1f)
             ) {
-              Text("Strategy Call", fontSize = 11.sp, color = SurfCyan)
+              Text("Strategy Call", fontSize = 11.sp, color = colors.cyan)
             }
           }
 
@@ -430,7 +420,7 @@ fun ActiveCallOverlay(
             Spacer(modifier = Modifier.height(8.dp))
             Surface(
               shape = RoundedCornerShape(10.dp),
-              color = if (micPermissionDenied) CoralAlert.copy(alpha = 0.16f) else SurfTeal.copy(alpha = 0.2f),
+              color = if (micPermissionDenied) colors.coralAlert.copy(alpha = 0.16f) else colors.teal.copy(alpha = 0.2f),
               modifier = Modifier.fillMaxWidth()
             ) {
               Text(
@@ -439,7 +429,7 @@ fun ActiveCallOverlay(
                   voiceUiState.partialTranscript.isNotBlank() -> "Listening: \"${voiceUiState.partialTranscript}\""
                   else -> "Listening for live caller speech..."
                 },
-                color = if (micPermissionDenied) CoralAlert else SurfCyan,
+                color = if (micPermissionDenied) colors.coralAlert else colors.cyan,
                 fontSize = 11.sp,
                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
               )
@@ -477,23 +467,23 @@ fun ActiveCallOverlay(
               Icon(
                 imageVector = if (voiceUiState.isListening) Icons.Default.Stop else Icons.Default.Mic,
                 contentDescription = if (voiceUiState.isListening) "Stop voice input" else "Speak to AI Receptionist",
-                tint = if (voiceUiState.isListening) CoralAlert else SurfTurquoise
+                tint = if (voiceUiState.isListening) colors.coralAlert else colors.turquoise
               )
             }
 
             OutlinedTextField(
               value = customQueryInput,
               onValueChange = { customQueryInput = it },
-              placeholder = { Text("Ask any custom question...", fontSize = 13.sp, color = SandTextSecondary) },
+              placeholder = { Text("Ask any custom question...", fontSize = 13.sp, color = colors.textSecondary) },
               modifier = Modifier
                 .weight(1f)
                 .testTag("call_query_input"),
               singleLine = true,
               colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = SurfTurquoise,
-                unfocusedBorderColor = SurfTeal,
-                focusedTextColor = SandTextPrimary,
-                unfocusedTextColor = SandTextPrimary
+                focusedBorderColor = colors.turquoise,
+                unfocusedBorderColor = colors.teal,
+                focusedTextColor = colors.textPrimary,
+                unfocusedTextColor = colors.textPrimary
               )
             )
             IconButton(
@@ -510,7 +500,7 @@ fun ActiveCallOverlay(
               Icon(
                 imageVector = Icons.AutoMirrored.Filled.Send,
                 contentDescription = "Send to Receptionist",
-                tint = SurfTurquoise
+                tint = colors.turquoise
               )
             }
           }
@@ -519,7 +509,7 @@ fun ActiveCallOverlay(
 
           Button(
             onClick = onEndCall,
-            colors = ButtonDefaults.buttonColors(containerColor = CoralAlert),
+            colors = ButtonDefaults.buttonColors(containerColor = colors.coralAlert),
             shape = RoundedCornerShape(14.dp),
             modifier = Modifier
               .fillMaxWidth()

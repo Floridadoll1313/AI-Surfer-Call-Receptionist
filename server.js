@@ -280,8 +280,8 @@ let chatGptConfig = {
 };
 
 let supabaseConfig = {
-  projectUrl: "https://kbgujyuxdopx.supabase.co",
-  anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.oceantidedrop_mock_anon_key"
+  projectUrl: process.env.VITE_SUPABASE_URL || "https://pdbpmnnjhzrfezfmvami.supabase.co",
+  anonKey: process.env.VITE_SUPABASE_PUBLISHABLE_KEY || ""
 };
 
 let gitHubConfig = {
