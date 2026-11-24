@@ -2,6 +2,8 @@ name: Android internal checks
 on:
   push:
     branches: [main, fix/internal-receptionist-catalog-history]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -37,7 +39,7 @@ jobs:
           fi
       - name: Build and test without production Firebase
         run: |
-          echo '{"project_info":{"project_number":"1234567890","project_id":"demo-receptionist-ci"},"client":[{"client_info":{"mobilesdk_app_id":"1:1234567890:android:0123456789abcdef","android_client_info":{"package_name":"com.example.oceansurfer"}},"api_key":[{"current_key":"offline-ci-placeholder"}]}],"configuration_version":"1"}' > app/google-services.json
+          echo '{"project_info":{"project_number":"1234567890","project_id":"demo-receptionist-ci"},"client":[{"client_info":{"mobilesdk_app_id":"1:1234567890:android:0123456789abcdef","android_client_info":{"package_name":"com.aistudio.oceansurfer.kxmvqp"}},"api_key":[{"current_key":"offline-ci-placeholder"}]}],"configuration_version":"1"}' > app/google-services.json
           gradle --stacktrace :app:assembleDebug :app:testDebugUnitTest
       - uses: actions/upload-artifact@v4
         if: always()
