@@ -794,11 +794,11 @@ class OceanSurferViewModel(
         businessName = businessName.ifBlank { "Coastal Partner" },
         contactName = contactName.ifBlank { "Client Lead" },
         contactEmail = contactEmail.trim(),
-        contactPhone = contactPhone.ifBlank { "+1 (555) 010-WAVE" },
+        contactPhone = contactPhone.trim(),
         biggestBottleneck = biggestBottleneck,
         recommendedProduct = recommended
       )
-      val remoteSync = SupabaseClient.submitWaveAuditLead(_supabaseConfig.value, dto)
+      // Keep the draft on this device until the owner confirms a live lead.
       repository.insertLead(
         WaveAuditLeadEntity(
           id = java.util.UUID.randomUUID().toString(),
@@ -808,7 +808,7 @@ class OceanSurferViewModel(
           contactPhone = dto.contactPhone,
           biggestBottleneck = dto.biggestBottleneck,
           recommendedProduct = recommended,
-          syncedToSupabase = remoteSync.isSuccess
+          syncedToSupabase = false
         )
       )
 
@@ -840,10 +840,20 @@ class OceanSurferViewModel(
         }
       }
 
-      _snackbarMessage.value = if (remoteSync.isSuccess) {
-        "Wave Check submitted to Supabase & logged for crew!"
-      } else {
-        "Wave Check saved locally & queued for crew ($recommended)!"
+      _snackbarMessage.value = "Lead saved on this device for owner review."
+    }
+  }
+
+  fun submitConfirmedLead(lead: WaveAuditLeadEntity, email: String, password: String) {
+    viewModelScope.launch {
+      try {
+        com.example.integrations.KaiOwnerLeadClient.submit(lead, email, password)
+        repository.insertLead(lead.copy(syncedToSupabase = true))
+        _snackbarMessage.value = "Live lead saved to AI SURFER."
+      } catch (e: java.io.IOException) {
+        _snackbarMessage.value = "Owner submission failed (${e.message}). Lead kept on device."
+      } catch (e: org.json.JSONException) {
+        _snackbarMessage.value = "Unexpected server response. Lead kept on device."
       }
     }
   }

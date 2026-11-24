@@ -14,6 +14,7 @@ android {
     applicationId = "com.aistudio.oceansurfer.kxmvqp"
     minSdk = 26
     targetSdk = 36
+    manifestPlaceholders["kaiAppLabel"] = "@string/app_name"
     versionCode = 2
     versionName = "1.0"
 
@@ -42,6 +43,10 @@ android {
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
     }
     debug {
+      if (providers.gradleProperty("kaiOwnerTest").orNull == "true") {
+        applicationIdSuffix = ".ownertest"
+        manifestPlaceholders["kaiAppLabel"] = "Kai Owner Test"
+      }
       signingConfig = signingConfigs.getByName("debugConfig")
     }
   }

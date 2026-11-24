@@ -414,7 +414,7 @@ fun ClientHubScreen(
           ) {
             Icon(Icons.Default.CloudDone, contentDescription = null, tint = colors.abyss, modifier = Modifier.size(16.dp))
             Spacer(modifier = Modifier.width(8.dp))
-            Text("Submit Wave Check to Supabase", color = colors.abyss, fontWeight = FontWeight.Bold)
+            Text("Save lead on device", color = colors.abyss, fontWeight = FontWeight.Bold)
           }
 
           AnimatedVisibility(visible = clientLeads.isNotEmpty()) {
@@ -423,7 +423,7 @@ fun ClientHubScreen(
               verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
               Text("Submitted Client Wave Checks (${clientLeads.size})", color = colors.goldenSun, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-              clientLeads.take(3).forEach { lead ->
+              clientLeads.forEach { lead ->
                 Surface(
                   shape = RoundedCornerShape(10.dp),
                   color = colors.card,
@@ -433,11 +433,42 @@ fun ClientHubScreen(
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                       Text("${lead.contactName} • ${lead.businessName}", color = colors.textPrimary, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                       Text(
-                        text = if (lead.syncedToSupabase) "SUPABASE SYNCED" else "QUEUED",
+                        text = if (lead.syncedToSupabase) "SUPABASE SYNCED" else "LOCAL",
                         color = if (lead.syncedToSupabase) colors.seaGreen else colors.goldenSun,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold
                       )
+                    }
+                    if (!lead.syncedToSupabase) {
+                      var confirm by remember(lead.id) { mutableStateOf(false) }
+                      OutlinedButton(onClick = { confirm = true }) { Text("Submit live lead") }
+                      if (confirm) {
+                        var ownerEmail by remember { mutableStateOf("") }
+                        var password by remember { mutableStateOf("") }
+                        androidx.compose.material3.AlertDialog(
+                          onDismissRequest = { confirm = false },
+                          title = { Text("Confirm live lead") },
+                          text = {
+                            Column {
+                              Text("Send ${lead.contactEmail} to AI SURFER as a real lead?")
+                              OutlinedTextField(ownerEmail, { ownerEmail = it }, singleLine = true,
+                                label = { Text("Owner sign-in email") })
+                              OutlinedTextField(password, { password = it }, singleLine = true,
+                                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                  keyboardType = androidx.compose.ui.text.input.KeyboardType.Password),
+                                label = { Text("Owner password") })
+                            }
+                          },
+                          confirmButton = {
+                            Button(enabled = ownerEmail.isNotBlank() && password.isNotEmpty(), onClick = {
+                              viewModel.submitConfirmedLead(lead, ownerEmail, password)
+                              confirm = false
+                            }) { Text("Send live lead") }
+                          },
+                          dismissButton = { OutlinedButton(onClick = { confirm = false }) { Text("Cancel") } }
+                        )
+                      }
                     }
                     Text("Recommended: ${lead.recommendedProduct}", color = colors.cyan, fontSize = 11.sp)
                   }
