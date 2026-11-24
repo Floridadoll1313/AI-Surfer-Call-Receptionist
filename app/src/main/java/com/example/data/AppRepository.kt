@@ -50,12 +50,10 @@ class AppRepository(private val database: AppDatabase) {
     var updated = 0
     for (remote in remoteCalls) {
       val match = localCalls.firstOrNull { local ->
-        local.id == remote.id ||
-          (ReturningCallerMatcher.normalizePhone(local.callerNumber) == ReturningCallerMatcher.normalizePhone(remote.callerNumber) &&
-            kotlin.math.abs(local.timestamp - remote.timestamp) < 5_000L)
+        local.callerNumber == remote.callerNumber && local.timestamp == remote.timestamp
       }
       if (match != null) {
-        if (match.status != remote.status || !match.supabaseSynced || match.isEscalated != remote.isEscalated) {
+        if (match.supabaseSynced && (match.status != remote.status || match.isEscalated != remote.isEscalated)) {
           callDao.updateCall(
             match.copy(
               status = remote.status,
@@ -67,7 +65,7 @@ class AppRepository(private val database: AppDatabase) {
           updated++
         }
       } else {
-        callDao.insertCall(remote.copy(supabaseSynced = true))
+        callDao.insertCall(remote.copy(id = 0L, supabaseSynced = true))
         updated++
       }
     }

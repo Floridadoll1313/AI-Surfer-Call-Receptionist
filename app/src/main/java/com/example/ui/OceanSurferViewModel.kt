@@ -693,6 +693,19 @@ class OceanSurferViewModel(
     _snackbarMessage.value = "Supabase connection updated."
   }
 
+  fun signInForCallSync(email: String, password: String) {
+    viewModelScope.launch {
+      try {
+        com.example.integrations.KaiOwnerLeadClient.signInForCalls(email, password)
+        updateSupabaseConfig(com.example.integrations.KaiOwnerLeadClient.project,
+          com.example.integrations.KaiOwnerLeadClient.publicKey)
+        testSupabaseConnection()
+      } catch (e: Exception) {
+        _supabaseConnectionState.value = SupabaseConnectionState.Error("Call sign-in failed: ${e.localizedMessage}")
+      }
+    }
+  }
+
   fun testSupabaseConnection() {
     viewModelScope.launch {
       _supabaseConnectionState.value = SupabaseConnectionState.Testing

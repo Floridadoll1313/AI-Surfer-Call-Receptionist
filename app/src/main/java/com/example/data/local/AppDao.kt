@@ -45,10 +45,10 @@ interface CallDao {
   @Update
   suspend fun updateCall(call: CallEntity)
 
-  @Query("UPDATE calls SET status = 'REVIEWED', isEscalated = 0 WHERE id = :id")
+  @Query("UPDATE calls SET status = 'REVIEWED', isEscalated = 0, supabaseSynced = 0 WHERE id = :id")
   suspend fun markReviewed(id: Long)
 
-  @Query("UPDATE calls SET status = 'PENDING_REVIEW', isEscalated = 0 WHERE id = :id")
+  @Query("UPDATE calls SET status = 'PENDING_REVIEW', isEscalated = 0, supabaseSynced = 0 WHERE id = :id")
   suspend fun markPending(id: Long)
 
   @Query("UPDATE calls SET status = 'ESCALATED', isEscalated = 1, escalatedAt = :time, escalationNotes = :notes WHERE id = :id")

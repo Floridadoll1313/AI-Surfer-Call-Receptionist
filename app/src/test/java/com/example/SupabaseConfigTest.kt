@@ -19,8 +19,8 @@ class SupabaseConfigTest {
   @Test
   fun supabaseConfig_usesBuildConfigUrlAndIgnoresPlaceholderKey() {
     val config = SupabaseConfig()
-    assertEquals("https://pdbpmnnjhzrfezfmvami.supabase.co", config.projectUrl)
-    assertEquals("pdbpmnnjhzrfezfmvami.supabase.co", SupabaseClient.extractHost(config.projectUrl))
+    assertEquals("https://mkgnyarwiscttobnytin.supabase.co", config.projectUrl)
+    assertEquals("mkgnyarwiscttobnytin.supabase.co", SupabaseClient.extractHost(config.projectUrl))
     if (BuildConfig.VITE_SUPABASE_PUBLISHABLE_KEY == SupabaseConfig.PLACEHOLDER_PUBLISHABLE_KEY) {
       assertEquals("", config.anonKey)
     }
@@ -38,7 +38,7 @@ class SupabaseConfigTest {
     )
 
     val loaded = IntegrationPrefsStore.loadSupabaseConfig(context)
-    assertEquals("https://pdbpmnnjhzrfezfmvami.supabase.co", loaded.projectUrl)
+    assertEquals("https://mkgnyarwiscttobnytin.supabase.co", loaded.projectUrl)
     assertEquals(SupabaseConfig.defaultPublishableKey(), loaded.anonKey)
 
     IntegrationPrefsStore.saveSupabaseConfig(
@@ -49,7 +49,8 @@ class SupabaseConfigTest {
       )
     )
     val migrated = IntegrationPrefsStore.loadSupabaseConfig(context)
-    assertEquals("https://pdbpmnnjhzrfezfmvami.supabase.co", migrated.projectUrl)
+    assertEquals("https://mkgnyarwiscttobnytin.supabase.co", migrated.projectUrl)
+    assertEquals("custom_key", migrated.anonKey)
   }
 
   @Test
