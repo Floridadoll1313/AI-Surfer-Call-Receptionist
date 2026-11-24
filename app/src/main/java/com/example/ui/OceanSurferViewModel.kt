@@ -34,6 +34,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -844,9 +845,10 @@ class OceanSurferViewModel(
     }
   }
 
-  fun submitConfirmedLead(lead: WaveAuditLeadEntity, email: String, password: String) {
+  fun submitConfirmedLead(selectedLead: WaveAuditLead, email: String, password: String) {
     viewModelScope.launch {
       try {
+        val lead = repository.allLeads.first().firstOrNull { it.id == selectedLead.id } ?: return@launch
         com.example.integrations.KaiOwnerLeadClient.submit(lead, email, password)
         repository.insertLead(lead.copy(syncedToSupabase = true))
         _snackbarMessage.value = "Live lead saved to AI SURFER."
