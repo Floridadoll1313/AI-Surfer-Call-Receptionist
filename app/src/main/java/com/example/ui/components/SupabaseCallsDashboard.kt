@@ -85,6 +85,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.local.CallEntity
+import com.example.integrations.BusinessLineId
+import com.example.integrations.BusinessPhonesConfig
 import com.example.integrations.EscalationAlertChannel
 import com.example.integrations.EscalationTriggerConfig
 import com.example.integrations.SupabaseCallFetcher
@@ -134,7 +136,6 @@ fun SupabaseCallsDashboard(
   onSelectStatusFilter: (CallStatusFilter) -> Unit,
   escalationTriggerConfig: EscalationTriggerConfig,
   onUpdateTriggerConfig: (Boolean, EscalationAlertChannel, String, String) -> Unit,
-  onTriggerTestEscalation: () -> Unit,
   onFetchFromSupabase: () -> Unit,
   onMarkReviewed: (Long) -> Unit,
   onMarkPending: (Long) -> Unit,
@@ -148,6 +149,9 @@ fun SupabaseCallsDashboard(
   customStartDateUtcMillis: Long? = null,
   customEndDateUtcMillis: Long? = null,
   onSelectCustomDateRange: ((Long?, Long?) -> Unit)? = null,
+  businessPhonesConfig: BusinessPhonesConfig = BusinessPhonesConfig(),
+  selectedPhoneLineFilter: BusinessLineId? = null,
+  onSelectPhoneLineFilter: ((BusinessLineId) -> Unit)? = null,
   modifier: Modifier = Modifier
 ) {
   val context = LocalContext.current
@@ -157,6 +161,7 @@ fun SupabaseCallsDashboard(
   var localDateFilter by rememberSaveable { mutableStateOf(CallDateFilter.ALL) }
   var localCustomStart by rememberSaveable { mutableStateOf<Long?>(null) }
   var localCustomEnd by rememberSaveable { mutableStateOf<Long?>(null) }
+  var localPhoneLineFilter by rememberSaveable { mutableStateOf(BusinessLineId.ALL) }
   var inspectingCallForSupabaseJson by remember { mutableStateOf<CallEntity?>(null) }
   var showTriggerSettings by remember { mutableStateOf(false) }
 
@@ -164,6 +169,7 @@ fun SupabaseCallsDashboard(
   val activeDateFilter = selectedDateFilter ?: localDateFilter
   val activeCustomStart = if (onSelectCustomDateRange != null) customStartDateUtcMillis else localCustomStart
   val activeCustomEnd = if (onSelectCustomDateRange != null) customEndDateUtcMillis else localCustomEnd
+  val activePhoneLineFilter = selectedPhoneLineFilter ?: localPhoneLineFilter
 
   val handleSearchChange: (String) -> Unit = { updated ->
     if (onSearchQueryChange != null) onSearchQueryChange(updated) else localSearchQuery = updated
@@ -178,6 +184,9 @@ fun SupabaseCallsDashboard(
       localCustomStart = start
       localCustomEnd = end
     }
+  }
+  val handlePhoneLineFilterChange: (BusinessLineId) -> Unit = { updated ->
+    if (onSelectPhoneLineFilter != null) onSelectPhoneLineFilter(updated) else localPhoneLineFilter = updated
   }
 
   // Status filter counts
@@ -201,7 +210,7 @@ fun SupabaseCallsDashboard(
     }
   }
 
-  // Filtered by Status, Category, Date Range, and Search
+  // Filtered by Status, Category, Date Range, Phone Line, and Search
   val filteredCalls = remember(
     calls,
     selectedStatusFilter,
@@ -209,7 +218,8 @@ fun SupabaseCallsDashboard(
     activeSearchQuery,
     activeDateFilter,
     activeCustomStart,
-    activeCustomEnd
+    activeCustomEnd,
+    activePhoneLineFilter
   ) {
     calls.filter { call ->
       val matchesStatus = when (selectedStatusFilter) {
@@ -233,8 +243,9 @@ fun SupabaseCallsDashboard(
         customStartUtcMillis = activeCustomStart,
         customEndUtcMillis = activeCustomEnd
       )
+      val matchesLine = CallFilterMatcher.matchesPhoneLine(call, activePhoneLineFilter)
 
-      matchesStatus && matchesCategory && matchesSearch && matchesDate
+      matchesStatus && matchesCategory && matchesSearch && matchesDate && matchesLine
     }
   }
 
@@ -513,20 +524,6 @@ fun SupabaseCallsDashboard(
                 Text("Save", fontSize = 11.sp, color = Color.White)
               }
             }
-
-            Spacer(modifier = Modifier.height(8.dp))
-            Button(
-              onClick = onTriggerTestEscalation,
-              colors = ButtonDefaults.buttonColors(containerColor = colors.coralAlert),
-              shape = RoundedCornerShape(10.dp),
-              modifier = Modifier
-                .fillMaxWidth()
-                .testTag("dashboard_test_escalation_button")
-            ) {
-              Icon(imageVector = Icons.Default.Warning, contentDescription = null, modifier = Modifier.size(15.dp))
-              Spacer(modifier = Modifier.width(6.dp))
-              Text("Test AI Escalation Trigger Now", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            }
           }
         }
       }
@@ -581,6 +578,15 @@ fun SupabaseCallsDashboard(
       onSelectDateFilter = handleDateFilterChange,
       onSelectCustomRange = handleCustomRangeChange,
       chipTagPrefix = "date_filter_chip_",
+      modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+    )
+
+    CallPhoneLineFilterBar(
+      selectedLine = activePhoneLineFilter,
+      phonesConfig = businessPhonesConfig,
+      calls = calls,
+      onSelectLine = handlePhoneLineFilterChange,
+      chipTagPrefix = "phone_line_filter_chip_",
       modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
     )
 
@@ -724,14 +730,32 @@ fun SupabaseCallsDashboard(
             fontSize = 14.sp
           )
           Text(
-            text = if (activeSearchQuery.isNotEmpty() || activeDateFilter != CallDateFilter.ALL) {
-              "Try adjusting your search query or date filter."
+            text = if (activeSearchQuery.isNotEmpty() || activeDateFilter != CallDateFilter.ALL || activePhoneLineFilter != BusinessLineId.ALL || selectedStatusFilter != CallStatusFilter.ALL) {
+              "Try clearing or adjusting your search, date, status, or phone line filters."
             } else {
-              "Tap 'Fetch' to sync latest logs from Supabase."
+              "Real calls from Phone 1 & Phone 2 appear automatically, or tap 'Fetch' to sync from Supabase."
             },
             color = colors.textSecondary,
             fontSize = 12.sp
           )
+          if (activeSearchQuery.isNotEmpty() || activeDateFilter != CallDateFilter.ALL || activePhoneLineFilter != BusinessLineId.ALL || selectedStatusFilter != CallStatusFilter.ALL || selectedCategory != DashboardCategory.ALL) {
+            Spacer(modifier = Modifier.height(10.dp))
+            OutlinedButton(
+              onClick = {
+                handleSearchChange("")
+                handleCustomRangeChange(null, null)
+                handleDateFilterChange(CallDateFilter.ALL)
+                handlePhoneLineFilterChange(BusinessLineId.ALL)
+                onSelectStatusFilter(CallStatusFilter.ALL)
+                selectedCategory = DashboardCategory.ALL
+              },
+              border = BorderStroke(1.dp, colors.turquoise),
+              shape = RoundedCornerShape(10.dp),
+              modifier = Modifier.testTag("clear_dashboard_filters_button")
+            ) {
+              Text("Clear All Filters", color = colors.turquoise, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            }
+          }
         }
       }
     } else {
@@ -744,6 +768,7 @@ fun SupabaseCallsDashboard(
         filteredCalls.forEach { call ->
           StaffCallDetailCard(
             call = call,
+            phonesConfig = businessPhonesConfig,
             targetAlertEmail = escalationTriggerConfig.targetEmail,
             onMarkReviewed = { onMarkReviewed(call.id) },
             onMarkPending = { onMarkPending(call.id) },
@@ -862,6 +887,7 @@ fun KpiMetricCard(
 @Composable
 fun StaffCallDetailCard(
   call: CallEntity,
+  phonesConfig: BusinessPhonesConfig = BusinessPhonesConfig(),
   targetAlertEmail: String = CallEscalationManager.TARGET_CREW_EMAIL,
   onMarkReviewed: () -> Unit,
   onMarkPending: () -> Unit,
@@ -943,6 +969,8 @@ fun StaffCallDetailCard(
 
         Column(horizontalAlignment = Alignment.End) {
           UrgencyBadge(urgency = call.urgency)
+          Spacer(modifier = Modifier.height(4.dp))
+          CallLineBadge(receivingLine = call.receivingLine, phonesConfig = phonesConfig)
           Spacer(modifier = Modifier.height(4.dp))
           Surface(
             shape = RoundedCornerShape(6.dp),

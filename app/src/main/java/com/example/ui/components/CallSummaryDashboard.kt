@@ -77,6 +77,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.local.CallEntity
+import com.example.integrations.BusinessLineId
+import com.example.integrations.BusinessPhonesConfig
 import com.example.ui.OceanSurferViewModel
 import com.example.ui.theme.OceanTheme
 import java.text.SimpleDateFormat
@@ -101,6 +103,8 @@ fun CallSummaryDashboard(
   val searchQuery by viewModel.callSearchQuery.collectAsStateWithLifecycle()
   val selectedDateFilter by viewModel.selectedDateFilter.collectAsStateWithLifecycle()
   val customDateRange by viewModel.customDateRange.collectAsStateWithLifecycle()
+  val phonesConfig by viewModel.businessPhonesConfig.collectAsStateWithLifecycle()
+  val selectedPhoneLineFilter by viewModel.selectedPhoneLineFilter.collectAsStateWithLifecycle()
 
   val displayCalls = remember(latestCalls, maxItems) {
     latestCalls.take(maxItems)
@@ -118,6 +122,9 @@ fun CallSummaryDashboard(
     customStartDateUtcMillis = customDateRange.first,
     customEndDateUtcMillis = customDateRange.second,
     onSelectCustomDateRange = { start, end -> viewModel.setCustomDateRange(start, end) },
+    businessPhonesConfig = phonesConfig,
+    selectedPhoneLineFilter = selectedPhoneLineFilter,
+    onSelectPhoneLineFilter = { line -> viewModel.setPhoneLineFilter(line) },
     onSyncLatest = { viewModel.fetchCallsFromSupabase() },
     onMarkReviewed = { callId -> viewModel.markCallReviewed(callId) },
     onTriggerEscalation = { call -> viewModel.triggerManualEscalation(call) },
@@ -127,7 +134,7 @@ fun CallSummaryDashboard(
 
 /**
  * Stateless CallSummaryDashboard rendering latest Room call logs over an immersive wave background
- * with Material 3 pull-to-refresh support, call search, and date range filtering.
+ * with Material 3 pull-to-refresh support, call search, date range filtering, and 2-phone line filtering.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -143,6 +150,9 @@ fun CallSummaryDashboard(
   customStartDateUtcMillis: Long? = null,
   customEndDateUtcMillis: Long? = null,
   onSelectCustomDateRange: ((Long?, Long?) -> Unit)? = null,
+  businessPhonesConfig: BusinessPhonesConfig = BusinessPhonesConfig(),
+  selectedPhoneLineFilter: BusinessLineId? = null,
+  onSelectPhoneLineFilter: ((BusinessLineId) -> Unit)? = null,
   onSyncLatest: () -> Unit = {},
   onMarkReviewed: (Long) -> Unit = {},
   onTriggerEscalation: (CallEntity) -> Unit = {},
@@ -155,11 +165,13 @@ fun CallSummaryDashboard(
   var localDateFilter by rememberSaveable { mutableStateOf(CallDateFilter.ALL) }
   var localCustomStart by rememberSaveable { mutableStateOf<Long?>(null) }
   var localCustomEnd by rememberSaveable { mutableStateOf<Long?>(null) }
+  var localPhoneLineFilter by rememberSaveable { mutableStateOf(BusinessLineId.ALL) }
 
   val activeSearchQuery = searchQuery ?: localSearchQuery
   val activeDateFilter = selectedDateFilter ?: localDateFilter
   val activeCustomStart = if (onSelectCustomDateRange != null) customStartDateUtcMillis else localCustomStart
   val activeCustomEnd = if (onSelectCustomDateRange != null) customEndDateUtcMillis else localCustomEnd
+  val activePhoneLineFilter = selectedPhoneLineFilter ?: localPhoneLineFilter
 
   val handleSearchChange: (String) -> Unit = { updated ->
     if (onSearchQueryChange != null) onSearchQueryChange(updated) else localSearchQuery = updated
@@ -175,13 +187,17 @@ fun CallSummaryDashboard(
       localCustomEnd = end
     }
   }
+  val handlePhoneLineFilterChange: (BusinessLineId) -> Unit = { updated ->
+    if (onSelectPhoneLineFilter != null) onSelectPhoneLineFilter(updated) else localPhoneLineFilter = updated
+  }
 
   val filteredCalls = remember(
     calls,
     activeSearchQuery,
     activeDateFilter,
     activeCustomStart,
-    activeCustomEnd
+    activeCustomEnd,
+    activePhoneLineFilter
   ) {
     calls.filter { call ->
       CallFilterMatcher.matchesSearch(call, activeSearchQuery) &&
@@ -190,7 +206,8 @@ fun CallSummaryDashboard(
           filter = activeDateFilter,
           customStartUtcMillis = activeCustomStart,
           customEndUtcMillis = activeCustomEnd
-        )
+        ) &&
+        CallFilterMatcher.matchesPhoneLine(call, activePhoneLineFilter)
     }
   }
 
@@ -274,6 +291,15 @@ fun CallSummaryDashboard(
                 containerColor = colors.deepBlue.copy(alpha = 0.9f),
                 showHeader = false
               )
+              CallPhoneLineFilterBar(
+                selectedLine = activePhoneLineFilter,
+                phonesConfig = businessPhonesConfig,
+                calls = calls,
+                onSelectLine = handlePhoneLineFilterChange,
+                chipTagPrefix = "summary_phone_line_chip_",
+                containerColor = colors.deepBlue.copy(alpha = 0.9f),
+                showHeader = false
+              )
             }
           }
 
@@ -293,6 +319,7 @@ fun CallSummaryDashboard(
                   handleSearchChange("")
                   handleCustomRangeChange(null, null)
                   handleDateFilterChange(CallDateFilter.ALL)
+                  handlePhoneLineFilterChange(BusinessLineId.ALL)
                 }
               )
             }
@@ -303,6 +330,7 @@ fun CallSummaryDashboard(
             ) { call ->
               CallSummaryWaveItemCard(
                 call = call,
+                phonesConfig = businessPhonesConfig,
                 onClick = { onCallSelected(call) },
                 onMarkReviewed = { onMarkReviewed(call.id) },
                 onTriggerEscalation = { onTriggerEscalation(call) }
@@ -736,7 +764,7 @@ private fun WaveEmptyCallsCard(
       )
       Spacer(modifier = Modifier.height(6.dp))
       Text(
-        text = "Simulate an incoming call or sync recent calls to populate your live Room summary feed.",
+        text = "Real incoming cell calls on Phone 1 or Phone 2, Client Wave Check intakes, and synced Supabase logs appear here automatically.",
         color = colors.textSecondary,
         fontSize = 12.sp
       )
@@ -824,7 +852,8 @@ fun CallSummaryWaveItemCard(
   onClick: () -> Unit,
   onMarkReviewed: () -> Unit,
   onTriggerEscalation: () -> Unit,
-  modifier: Modifier = Modifier
+  modifier: Modifier = Modifier,
+  phonesConfig: BusinessPhonesConfig = BusinessPhonesConfig()
 ) {
   val colors = OceanTheme.colors
   var isExpanded by remember { mutableStateOf(false) }
@@ -903,7 +932,11 @@ fun CallSummaryWaveItemCard(
 
         Spacer(modifier = Modifier.width(8.dp))
 
-        UrgencyBadge(urgency = call.urgency)
+        Column(horizontalAlignment = Alignment.End) {
+          UrgencyBadge(urgency = call.urgency)
+          Spacer(modifier = Modifier.height(4.dp))
+          CallLineBadge(receivingLine = call.receivingLine, phonesConfig = phonesConfig)
+        }
       }
 
       Spacer(modifier = Modifier.height(10.dp))

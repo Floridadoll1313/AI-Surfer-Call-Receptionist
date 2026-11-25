@@ -36,19 +36,40 @@ class MainActivityLaunchTest {
     composeTestRule.onNodeWithTag("nav_products").assertIsDisplayed()
     composeTestRule.onNodeWithTag("nav_integrations").assertIsDisplayed()
 
+    // Verify real 2-phone card on Receptionist screen and no fake test alert button
+    composeTestRule.onNodeWithTag("two_phone_status_card").performScrollTo().assertIsDisplayed()
+    composeTestRule.onNodeWithTag("open_ai_instruments_button").performScrollTo().assertIsDisplayed()
+    composeTestRule.onNodeWithTag("test_call_alert_button").assertDoesNotExist()
+
     // Navigate to Dashboard (Wave Summary + Search & Filters)
     composeTestRule.onNodeWithTag("nav_calls").performClick()
     composeTestRule.onNodeWithTag("call_summary_dashboard").assertIsDisplayed()
     composeTestRule.onNodeWithTag("mode_search_filters_button").performClick()
     composeTestRule.onNodeWithTag("call_search_input").performScrollTo().assertIsDisplayed()
-    composeTestRule.onNodeWithText("STATUS FILTERS").performScrollTo().assertIsDisplayed()
+    composeTestRule.onNodeWithText("BUSINESS PHONE LINE").performScrollTo().assertIsDisplayed()
     composeTestRule.onNodeWithTag("date_filter_chip_today").performScrollTo().assertIsDisplayed()
+    composeTestRule.onNodeWithText("STATUS FILTERS").performScrollTo().assertIsDisplayed()
+    composeTestRule.onNodeWithTag("phone_line_filter_chip_all").performScrollTo().assertIsDisplayed()
+    composeTestRule.onNodeWithTag("phone_line_filter_chip_phone_1").performScrollTo().assertIsDisplayed()
+    composeTestRule.onNodeWithTag("phone_line_filter_chip_phone_2").performScrollTo().assertIsDisplayed()
 
-    // Navigate to Client AI, Products, and Settings
+    // Navigate to Client AI and verify all 7 AI instruments selector + switching
     composeTestRule.onNodeWithTag("nav_client_hub").performClick()
+    composeTestRule.onNodeWithTag("ai_instruments_selector").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("ai_tool_chip_copilot_chat").performClick()
+    composeTestRule.onNodeWithTag("copilot_chat_card").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("ai_tool_chip_wave_advisor").performClick()
+    composeTestRule.onNodeWithTag("client_ai_advisor_card").assertIsDisplayed()
+
+    // Products and Settings (2-Phone Setup + Phone Verification + Publishing)
     composeTestRule.onNodeWithTag("nav_products").performClick()
     composeTestRule.onNodeWithTag("add_item_fab").assertIsDisplayed()
     composeTestRule.onNodeWithTag("nav_integrations").performClick()
+    composeTestRule.onNodeWithTag("google_account_card").performScrollTo().assertIsDisplayed()
+    composeTestRule.onNodeWithTag("google_sign_in_button").performScrollTo().assertIsDisplayed()
+    composeTestRule.onNodeWithTag("two_phone_setup_card").performScrollTo().assertIsDisplayed()
+    composeTestRule.onNodeWithTag("phone_verification_card").performScrollTo().assertIsDisplayed()
+    composeTestRule.onNodeWithTag("permissions_and_publishing_card").performScrollTo().assertIsDisplayed()
     composeTestRule.onNodeWithTag("chatgpt_integration_card").performScrollTo().assertIsDisplayed()
   }
 

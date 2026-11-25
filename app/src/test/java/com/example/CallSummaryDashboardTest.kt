@@ -379,4 +379,77 @@ class CallSummaryDashboardTest {
       )
     )
   }
+
+  @Test
+  fun callSummaryDashboard_filtersCallsByBusinessPhoneLineChips() {
+    val phone1Call = CallEntity(
+      id = 401L,
+      callerNumber = "+1 (808) 555-4101",
+      callerName = "Phone One Caller",
+      timestamp = System.currentTimeMillis(),
+      durationSeconds = 30,
+      status = "PENDING_REVIEW",
+      urgency = "MEDIUM",
+      topic = "GENERAL",
+      summary = "Called Phone 1 directly.",
+      transcription = "Real Cell Call [Line: PHONE_1]",
+      customerQuestion = "Can I book a consultation?",
+      aiResponse = "Yes!",
+      receivingLine = "PHONE_1"
+    )
+    val phone2Call = CallEntity(
+      id = 402L,
+      callerNumber = "+1 (808) 555-4202",
+      callerName = "Phone Two Caller",
+      timestamp = System.currentTimeMillis(),
+      durationSeconds = 45,
+      status = "PENDING_REVIEW",
+      urgency = "HIGH",
+      topic = "ENTERPRISE",
+      summary = "Called Phone 2 directly.",
+      transcription = "Real Cell Call [Line: PHONE_2]",
+      customerQuestion = "Looking for Big Kahuna setup.",
+      aiResponse = "Alerting crew!",
+      receivingLine = "PHONE_2"
+    )
+
+    assertTrue(CallFilterMatcher.matchesPhoneLine(phone1Call, com.example.integrations.BusinessLineId.PHONE_1))
+    assertFalse(CallFilterMatcher.matchesPhoneLine(phone1Call, com.example.integrations.BusinessLineId.PHONE_2))
+    assertTrue(CallFilterMatcher.matchesPhoneLine(phone2Call, com.example.integrations.BusinessLineId.PHONE_2))
+
+    composeTestRule.setContent {
+      ThemeProvider(
+        palette = OceanPalette.DEEP_SEA,
+        animateTransitions = false
+      ) {
+        CallSummaryDashboard(calls = listOf(phone1Call, phone2Call))
+      }
+    }
+
+    composeTestRule.onNodeWithTag("call_summary_list")
+      .performScrollToNode(hasTestTag("call_summary_filter_card"))
+    composeTestRule.onNodeWithTag("summary_phone_line_chip_phone_2").performClick()
+
+    composeTestRule.onNodeWithTag("call_summary_list")
+      .performScrollToNode(hasTestTag("call_summary_item_402"))
+    composeTestRule.onNodeWithTag("call_summary_item_402").assertExists()
+    composeTestRule.onNodeWithTag("call_summary_item_401").assertDoesNotExist()
+
+    composeTestRule.onNodeWithTag("call_summary_list")
+      .performScrollToNode(hasTestTag("call_summary_filter_card"))
+    composeTestRule.onNodeWithTag("summary_phone_line_chip_phone_1").performClick()
+
+    composeTestRule.onNodeWithTag("call_summary_list")
+      .performScrollToNode(hasTestTag("call_summary_item_401"))
+    composeTestRule.onNodeWithTag("call_summary_item_401").assertExists()
+    composeTestRule.onNodeWithTag("call_summary_item_402").assertDoesNotExist()
+
+    composeTestRule.onNodeWithTag("call_summary_list")
+      .performScrollToNode(hasTestTag("call_summary_filter_card"))
+    composeTestRule.onNodeWithTag("summary_phone_line_chip_all").performClick()
+
+    composeTestRule.onNodeWithTag("call_summary_list")
+      .performScrollToNode(hasTestTag("call_summary_item_402"))
+    composeTestRule.onNodeWithTag("call_summary_item_402").assertExists()
+  }
 }

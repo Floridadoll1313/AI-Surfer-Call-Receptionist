@@ -60,4 +60,49 @@ class CallStateReceiverTest {
     assertTrue(resultCall.isEscalated)
     assertEquals("+1 (808) 555-7744", resultCall.callerNumber)
   }
+
+  @Test
+  fun incomingCallOnPhone2TagsCallAndTranscriptionWithPhone2Line() = runBlocking {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    com.example.integrations.IntegrationPrefsStore.saveBusinessPhonesConfig(
+      context,
+      com.example.integrations.BusinessPhonesConfig(
+        activeDeviceLine = com.example.integrations.BusinessLineId.PHONE_2,
+        phone1Label = "Front Desk",
+        phone2Label = "Owner Mobile"
+      )
+    )
+
+    var syncedTranscription = ""
+    suspend fun event(state: String) = CallStateReceiver.processPhoneStateChange(
+      context = context,
+      state = state,
+      incomingNumber = "+1 (808) 555-8822",
+      callerNameOverride = "Lani Real",
+      transcriptOverride = "Real call received on second business phone.",
+      geminiSummarizer = { _, callerName, _, _, _, _ ->
+        ReceptionistResult(
+          responseText = "Aloha $callerName!",
+          summary = "Topic: General Inquiry | Action Items: Follow up | Sentiment: Positive",
+          urgency = "MEDIUM",
+          topic = "GENERAL",
+          requiresImmediateEscalation = false,
+          escalationReason = ""
+        )
+      },
+      supabaseSaver = { _, call ->
+        syncedTranscription = call.transcription
+        Result.success(Unit)
+      }
+    )
+
+    event(TelephonyManager.EXTRA_STATE_RINGING)
+    event(TelephonyManager.EXTRA_STATE_OFFHOOK)
+    val saved = event(TelephonyManager.EXTRA_STATE_IDLE)
+
+    assertNotNull(saved)
+    assertEquals("PHONE_2", saved!!.receivingLine)
+    assertTrue(saved.transcription.contains("[Line: PHONE_2]"))
+    assertTrue(syncedTranscription.contains("Owner Mobile"))
+  }
 }

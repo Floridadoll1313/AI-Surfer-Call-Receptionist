@@ -14,12 +14,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Today
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DatePickerDefaults
@@ -37,6 +40,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.rememberDateRangePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,6 +54,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.local.CallEntity
+import com.example.integrations.BusinessLineId
+import com.example.integrations.BusinessPhonesConfig
 import com.example.ui.theme.OceanTheme
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -82,7 +88,16 @@ object CallFilterMatcher {
       call.aiResponse.lowercase(Locale.getDefault()).contains(lower) ||
       call.topic.lowercase(Locale.getDefault()).contains(lower) ||
       call.urgency.lowercase(Locale.getDefault()).contains(lower) ||
-      call.status.lowercase(Locale.getDefault()).contains(lower)
+      call.status.lowercase(Locale.getDefault()).contains(lower) ||
+      call.receivingLine.lowercase(Locale.getDefault()).contains(lower)
+  }
+
+  fun matchesPhoneLine(call: CallEntity, filter: BusinessLineId): Boolean {
+    return when (filter) {
+      BusinessLineId.ALL -> true
+      BusinessLineId.PHONE_1 -> call.receivingLine.isBlank() || call.receivingLine.equals(BusinessLineId.PHONE_1.id, ignoreCase = true)
+      BusinessLineId.PHONE_2 -> call.receivingLine.equals(BusinessLineId.PHONE_2.id, ignoreCase = true)
+    }
   }
 
   fun matchesDateFilter(
@@ -216,9 +231,23 @@ fun CallSearchBar(
   containerColor: Color = OceanTheme.colors.deepBlue
 ) {
   val colors = OceanTheme.colors
+  var localQuery by remember { mutableStateOf(query) }
+  var lastDispatchedQuery by remember { mutableStateOf(query) }
+
+  LaunchedEffect(query) {
+    if (query != lastDispatchedQuery) {
+      localQuery = query
+      lastDispatchedQuery = query
+    }
+  }
+
   OutlinedTextField(
-    value = query,
-    onValueChange = onQueryChange,
+    value = localQuery,
+    onValueChange = { updated ->
+      localQuery = updated
+      lastDispatchedQuery = updated
+      onQueryChange(updated)
+    },
     placeholder = {
       Text(
         text = "Search caller, phone, topic, inquiry, or summary...",
@@ -236,9 +265,13 @@ fun CallSearchBar(
       )
     },
     trailingIcon = {
-      if (query.isNotEmpty()) {
+      if (localQuery.isNotEmpty()) {
         IconButton(
-          onClick = { onQueryChange("") },
+          onClick = {
+            localQuery = ""
+            lastDispatchedQuery = ""
+            onQueryChange("")
+          },
           modifier = Modifier
             .minimumInteractiveComponentSize()
             .testTag(clearButtonTag)
@@ -253,6 +286,7 @@ fun CallSearchBar(
       }
     },
     singleLine = true,
+    keyboardOptions = KeyboardOptions(autoCorrectEnabled = false),
     shape = RoundedCornerShape(14.dp),
     colors = OutlinedTextFieldDefaults.colors(
       focusedBorderColor = colors.turquoise,
@@ -453,6 +487,129 @@ fun CallDateFilterBar(
           todayDateBorderColor = colors.turquoise
         ),
         modifier = Modifier.height(440.dp)
+      )
+    }
+  }
+}
+
+@Composable
+fun CallPhoneLineFilterBar(
+  selectedLine: BusinessLineId,
+  phonesConfig: BusinessPhonesConfig,
+  calls: List<CallEntity>,
+  onSelectLine: (BusinessLineId) -> Unit,
+  modifier: Modifier = Modifier,
+  chipTagPrefix: String = "phone_line_filter_chip_",
+  containerColor: Color = OceanTheme.colors.deepBlue,
+  showHeader: Boolean = true
+) {
+  val colors = OceanTheme.colors
+  val counts = remember(calls) {
+    mapOf(
+      BusinessLineId.ALL to calls.size,
+      BusinessLineId.PHONE_1 to calls.count { CallFilterMatcher.matchesPhoneLine(it, BusinessLineId.PHONE_1) },
+      BusinessLineId.PHONE_2 to calls.count { CallFilterMatcher.matchesPhoneLine(it, BusinessLineId.PHONE_2) }
+    )
+  }
+
+  Column(modifier = modifier.fillMaxWidth()) {
+    if (showHeader) {
+      Text(
+        text = "BUSINESS PHONE LINE",
+        color = colors.cyan,
+        fontSize = 10.sp,
+        fontWeight = FontWeight.ExtraBold,
+        letterSpacing = 1.sp,
+        modifier = Modifier.padding(bottom = 2.dp)
+      )
+    }
+    Row(
+      modifier = Modifier
+        .fillMaxWidth()
+        .horizontalScroll(rememberScrollState()),
+      horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+      BusinessLineId.entries.forEach { line ->
+        val isSelected = selectedLine == line
+        val count = counts[line] ?: 0
+        val lineText = when (line) {
+          BusinessLineId.ALL -> "All Phones ($count)"
+          BusinessLineId.PHONE_1 -> "Phone 1: ${phonesConfig.phone1Label.take(14)} ($count)"
+          BusinessLineId.PHONE_2 -> "Phone 2: ${phonesConfig.phone2Label.take(14)} ($count)"
+        }
+        FilterChip(
+          selected = isSelected,
+          onClick = { onSelectLine(line) },
+          leadingIcon = {
+            Icon(
+              imageVector = Icons.Default.PhoneAndroid,
+              contentDescription = null,
+              modifier = Modifier.size(14.dp),
+              tint = if (isSelected) colors.abyss else colors.cyan
+            )
+          },
+          label = {
+            Text(
+              text = lineText,
+              fontSize = 11.sp,
+              fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+            )
+          },
+          colors = FilterChipDefaults.filterChipColors(
+            selectedContainerColor = colors.turquoise,
+            selectedLabelColor = colors.abyss,
+            containerColor = containerColor,
+            labelColor = colors.textPrimary
+          ),
+          border = BorderStroke(
+            width = 1.dp,
+            color = if (isSelected) Color.Transparent else colors.teal.copy(alpha = 0.45f)
+          ),
+          modifier = Modifier
+            .defaultMinSize(minHeight = 40.dp)
+            .testTag("$chipTagPrefix${line.id.lowercase(Locale.US)}")
+        )
+      }
+    }
+  }
+}
+
+@Composable
+fun CallLineBadge(
+  receivingLine: String,
+  phonesConfig: BusinessPhonesConfig,
+  modifier: Modifier = Modifier
+) {
+  val colors = OceanTheme.colors
+  val isPhone2 = receivingLine.equals(BusinessLineId.PHONE_2.id, ignoreCase = true)
+  val tint = if (isPhone2) colors.goldenSun else colors.cyan
+  val label = if (isPhone2) {
+    "Phone 2 • ${phonesConfig.phone2Label.take(14)}"
+  } else {
+    "Phone 1 • ${phonesConfig.phone1Label.take(14)}"
+  }
+  Surface(
+    shape = RoundedCornerShape(6.dp),
+    color = tint.copy(alpha = 0.16f),
+    border = BorderStroke(1.dp, tint.copy(alpha = 0.45f)),
+    modifier = modifier
+  ) {
+    Row(
+      modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+      verticalAlignment = Alignment.CenterVertically
+    ) {
+      Icon(
+        imageVector = Icons.Default.PhoneAndroid,
+        contentDescription = null,
+        tint = tint,
+        modifier = Modifier.size(10.dp)
+      )
+      Spacer(modifier = Modifier.width(3.dp))
+      Text(
+        text = label,
+        color = tint,
+        fontSize = 9.sp,
+        fontWeight = FontWeight.Bold
       )
     }
   }

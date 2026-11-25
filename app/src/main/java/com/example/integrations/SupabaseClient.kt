@@ -202,29 +202,55 @@ object SupabaseClient {
       val rows = response.body().orEmpty().map { dto ->
         val parsedTs = parseIsoTimestamp(dto.callTimestamp) ?: System.currentTimeMillis()
         val deadline = parsedTs + (dto.escalationAlertMinutes.coerceAtLeast(1) * 60_000L)
+        val rawTranscript = dto.transcription ?: ""
+        val parsedLine = extractReceivingLine(rawTranscript)
         CallEntity(
           id = dto.id ?: 0L,
-          callerNumber = dto.callerNumber.ifBlank { "+1 (000) 000-0000" },
-          callerName = dto.callerName.ifBlank { "Supabase Caller" },
+          callerNumber = dto.callerNumber.ifBlank { "Private / Hidden Number" },
+          callerName = dto.callerName.ifBlank { "Incoming Caller" },
           timestamp = parsedTs,
           durationSeconds = dto.durationSeconds,
           status = dto.status,
           urgency = dto.urgency,
           topic = dto.topic,
           summary = dto.chatgptSummary ?: dto.summary ?: "Synced from Supabase public.calls",
-          transcription = dto.transcription ?: "",
+          transcription = rawTranscript,
           customerQuestion = dto.customerQuestion,
           aiResponse = dto.aiResponse,
           escalationAlertMinutes = dto.escalationAlertMinutes,
           escalationDeadline = deadline,
           isEscalated = dto.isEscalated,
-          escalationNotes = dto.escalationNotes ?: ""
+          escalationNotes = dto.escalationNotes ?: "",
+          receivingLine = parsedLine
         )
       }
       Result.success(rows)
     } catch (e: Exception) {
       Result.failure(e)
     }
+  }
+
+  fun extractReceivingLine(transcription: String?): String {
+    if (transcription.isNullOrBlank()) return BusinessLineId.PHONE_1.id
+    val match = Regex("\\[Line:\\s*(PHONE_1|PHONE_2)\\b[^\\]]*\\]", RegexOption.IGNORE_CASE)
+      .find(transcription)
+    return when (match?.groupValues?.getOrNull(1)?.uppercase()) {
+      BusinessLineId.PHONE_2.id -> BusinessLineId.PHONE_2.id
+      else -> BusinessLineId.PHONE_1.id
+    }
+  }
+
+  private fun appendLineTag(transcription: String, lineId: String): String {
+    val cleanLine = if (lineId.equals(BusinessLineId.PHONE_2.id, ignoreCase = true)) {
+      BusinessLineId.PHONE_2.id
+    } else {
+      BusinessLineId.PHONE_1.id
+    }
+    if (Regex("\\[Line:\\s*(PHONE_1|PHONE_2)\\b", RegexOption.IGNORE_CASE).containsMatchIn(transcription)) {
+      return transcription
+    }
+    val tag = "[Line: $cleanLine]"
+    return if (transcription.isBlank()) tag else "$transcription\n$tag"
   }
 
   suspend fun syncCallRecord(config: SupabaseConfig, call: CallEntity): Result<Unit> {
@@ -246,7 +272,7 @@ object SupabaseClient {
         topic = call.topic,
         summary = call.summary,
         chatgptSummary = call.summary,
-        transcription = call.transcription,
+        transcription = appendLineTag(call.transcription, call.receivingLine),
         customerQuestion = call.customerQuestion,
         aiResponse = call.aiResponse,
         escalationAlertMinutes = call.escalationAlertMinutes,

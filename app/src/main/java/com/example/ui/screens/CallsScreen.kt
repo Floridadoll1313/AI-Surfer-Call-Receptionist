@@ -57,6 +57,8 @@ fun CallsScreen(
   val callSearchQuery by viewModel.callSearchQuery.collectAsStateWithLifecycle()
   val selectedDateFilter by viewModel.selectedDateFilter.collectAsStateWithLifecycle()
   val customDateRange by viewModel.customDateRange.collectAsStateWithLifecycle()
+  val businessPhonesConfig by viewModel.businessPhonesConfig.collectAsStateWithLifecycle()
+  val selectedPhoneLineFilter by viewModel.selectedPhoneLineFilter.collectAsStateWithLifecycle()
   val escalationTriggerConfig by viewModel.escalationTriggerConfig.collectAsStateWithLifecycle()
   val supabaseConfig by viewModel.supabaseConfig.collectAsStateWithLifecycle()
   val scrollState = rememberScrollState()
@@ -77,7 +79,7 @@ fun CallsScreen(
   ) {
     OceanWaveHeader(
       title = "AI Call Dashboard",
-      subtitle = "Room Wave Summaries, Filters & Escalation Alerts"
+      subtitle = "2-Phone Real Call Summaries, Search & Alerts"
     )
 
     // Mode Switcher: Immersive Room Wave Summary vs. Search & Operations Filters
@@ -172,7 +174,6 @@ fun CallsScreen(
                 webhookUrl = webhookUrl
               )
             },
-            onTriggerTestEscalation = { viewModel.triggerTestCallAlert() },
             onFetchFromSupabase = { viewModel.fetchCallsFromSupabase() },
             onMarkReviewed = { callId -> viewModel.markCallReviewed(callId) },
             onMarkPending = { callId -> viewModel.markCallPending(callId) },
@@ -186,6 +187,9 @@ fun CallsScreen(
             customStartDateUtcMillis = customDateRange.first,
             customEndDateUtcMillis = customDateRange.second,
             onSelectCustomDateRange = { start, end -> viewModel.setCustomDateRange(start, end) },
+            businessPhonesConfig = businessPhonesConfig,
+            selectedPhoneLineFilter = selectedPhoneLineFilter,
+            onSelectPhoneLineFilter = { line -> viewModel.setPhoneLineFilter(line) },
             modifier = Modifier.padding(bottom = 24.dp)
           )
         }

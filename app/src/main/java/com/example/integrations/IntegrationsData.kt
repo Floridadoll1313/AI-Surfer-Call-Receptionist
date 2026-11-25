@@ -61,6 +61,119 @@ data class EscalationTriggerConfig(
   val escalateOnHighUrgency: Boolean = false
 )
 
+enum class BusinessLineId(val id: String, val shortLabel: String) {
+  ALL("ALL", "All Phones"),
+  PHONE_1("PHONE_1", "Phone 1"),
+  PHONE_2("PHONE_2", "Phone 2");
+
+  companion object {
+    fun fromId(raw: String?): BusinessLineId {
+      return when (raw?.trim()?.uppercase()) {
+        "PHONE_2" -> PHONE_2
+        "ALL" -> ALL
+        else -> PHONE_1
+      }
+    }
+  }
+}
+
+data class BusinessPhonesConfig(
+  val activeDeviceLine: BusinessLineId = BusinessLineId.PHONE_1,
+  val phone1Label: String = "Main Business Cell",
+  val phone1Number: String = "",
+  val phone2Label: String = "Secondary / Backup Cell",
+  val phone2Number: String = "",
+  val crossPhoneAlertsEnabled: Boolean = true,
+  val phone1Verified: Boolean = false,
+  val phone1VerifiedAt: Long = 0L,
+  val phone2Verified: Boolean = false,
+  val phone2VerifiedAt: Long = 0L,
+  val verifiedMethod: String = ""
+) {
+  fun displayLabelFor(lineId: String): String {
+    return when (lineId.trim().uppercase()) {
+      BusinessLineId.PHONE_2.id -> "Phone 2 • ${phone2Label.ifBlank { "Secondary Cell" }}"
+      BusinessLineId.PHONE_1.id -> "Phone 1 • ${phone1Label.ifBlank { "Main Cell" }}"
+      else -> "Phone 1 • ${phone1Label.ifBlank { "Main Cell" }}"
+    }
+  }
+
+  fun activeLineDisplay(): String = displayLabelFor(activeDeviceLine.id)
+
+  fun activeLineNumber(): String {
+    return if (activeDeviceLine == BusinessLineId.PHONE_2) phone2Number else phone1Number
+  }
+
+  fun isLineVerified(line: BusinessLineId): Boolean {
+    return when (line) {
+      BusinessLineId.PHONE_1 -> phone1Verified
+      BusinessLineId.PHONE_2 -> phone2Verified
+      BusinessLineId.ALL -> phone1Verified && phone2Verified
+    }
+  }
+}
+
+data class TeamSetupBundle(
+  val supabaseUrl: String,
+  val supabaseKey: String,
+  val phone1Label: String,
+  val phone1Number: String,
+  val phone2Label: String,
+  val phone2Number: String,
+  val alertEmail: String,
+  val webhookUrl: String
+)
+
+object TeamSetupCodec {
+  private const val PREFIX = "OTDSURFER1:"
+
+  fun encode(
+    supabaseConfig: SupabaseConfig,
+    phonesConfig: BusinessPhonesConfig,
+    escalationConfig: EscalationTriggerConfig
+  ): String {
+    val json = org.json.JSONObject().apply {
+      put("u", supabaseConfig.projectUrl.trim())
+      put("k", supabaseConfig.anonKey.trim())
+      put("p1l", phonesConfig.phone1Label.trim())
+      put("p1n", phonesConfig.phone1Number.trim())
+      put("p2l", phonesConfig.phone2Label.trim())
+      put("p2n", phonesConfig.phone2Number.trim())
+      put("em", escalationConfig.targetEmail.trim())
+      put("wh", escalationConfig.webhookUrl.trim())
+    }.toString()
+    val encoded = android.util.Base64.encodeToString(
+      json.toByteArray(Charsets.UTF_8),
+      android.util.Base64.NO_WRAP
+    )
+    return "$PREFIX$encoded"
+  }
+
+  fun decode(raw: String): TeamSetupBundle? {
+    val trimmed = raw.trim()
+    if (!trimmed.startsWith(PREFIX)) return null
+    return try {
+      val payload = trimmed.removePrefix(PREFIX).trim()
+      val decodedBytes = android.util.Base64.decode(payload, android.util.Base64.DEFAULT)
+      val json = org.json.JSONObject(String(decodedBytes, Charsets.UTF_8))
+      val url = json.optString("u", "").trim()
+      if (!url.startsWith("http")) return null
+      TeamSetupBundle(
+        supabaseUrl = url,
+        supabaseKey = json.optString("k", "").trim(),
+        phone1Label = json.optString("p1l", "Main Business Cell").trim().ifBlank { "Main Business Cell" },
+        phone1Number = json.optString("p1n", "").trim(),
+        phone2Label = json.optString("p2l", "Secondary / Backup Cell").trim().ifBlank { "Secondary / Backup Cell" },
+        phone2Number = json.optString("p2n", "").trim(),
+        alertEmail = json.optString("em", "oceantidedropservice@gmail.com").trim().ifBlank { "oceantidedropservice@gmail.com" },
+        webhookUrl = json.optString("wh", "").trim()
+      )
+    } catch (_: Exception) {
+      null
+    }
+  }
+}
+
 data class WaveAuditLead(
   val id: String = java.util.UUID.randomUUID().toString(),
   val businessName: String,
@@ -217,6 +330,77 @@ object IntegrationPrefsStore {
   private const val KEY_CHATGPT_API_KEY = "chatgpt_api_key"
   private const val KEY_CHATGPT_MODEL = "chatgpt_model"
   private const val KEY_CHATGPT_ENABLED = "chatgpt_enabled"
+  private const val KEY_ACTIVE_DEVICE_LINE = "active_device_line"
+  private const val KEY_PHONE_1_LABEL = "phone_1_label"
+  private const val KEY_PHONE_1_NUMBER = "phone_1_number"
+  private const val KEY_PHONE_2_LABEL = "phone_2_label"
+  private const val KEY_PHONE_2_NUMBER = "phone_2_number"
+  private const val KEY_CROSS_PHONE_ALERTS = "cross_phone_alerts_enabled"
+  private const val KEY_PHONE_1_VERIFIED = "phone_1_verified"
+  private const val KEY_PHONE_1_VERIFIED_AT = "phone_1_verified_at"
+  private const val KEY_PHONE_2_VERIFIED = "phone_2_verified"
+  private const val KEY_PHONE_2_VERIFIED_AT = "phone_2_verified_at"
+  private const val KEY_VERIFIED_METHOD = "phone_verified_method"
+  private const val KEY_NOTIFIED_REMOTE_KEYS = "notified_remote_call_keys"
+
+  fun saveBusinessPhonesConfig(context: Context, config: BusinessPhonesConfig) {
+    val line = if (config.activeDeviceLine == BusinessLineId.PHONE_2) {
+      BusinessLineId.PHONE_2.id
+    } else {
+      BusinessLineId.PHONE_1.id
+    }
+    context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
+      .putString(KEY_ACTIVE_DEVICE_LINE, line)
+      .putString(KEY_PHONE_1_LABEL, config.phone1Label.trim().ifBlank { "Main Business Cell" })
+      .putString(KEY_PHONE_1_NUMBER, config.phone1Number.trim())
+      .putString(KEY_PHONE_2_LABEL, config.phone2Label.trim().ifBlank { "Secondary / Backup Cell" })
+      .putString(KEY_PHONE_2_NUMBER, config.phone2Number.trim())
+      .putBoolean(KEY_CROSS_PHONE_ALERTS, config.crossPhoneAlertsEnabled)
+      .putBoolean(KEY_PHONE_1_VERIFIED, config.phone1Verified)
+      .putLong(KEY_PHONE_1_VERIFIED_AT, config.phone1VerifiedAt)
+      .putBoolean(KEY_PHONE_2_VERIFIED, config.phone2Verified)
+      .putLong(KEY_PHONE_2_VERIFIED_AT, config.phone2VerifiedAt)
+      .putString(KEY_VERIFIED_METHOD, config.verifiedMethod)
+      .apply()
+  }
+
+  fun loadBusinessPhonesConfig(context: Context): BusinessPhonesConfig {
+    val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    val defaults = BusinessPhonesConfig()
+    val rawLine = prefs.getString(KEY_ACTIVE_DEVICE_LINE, defaults.activeDeviceLine.id)
+    val activeLine = if (rawLine == BusinessLineId.PHONE_2.id) BusinessLineId.PHONE_2 else BusinessLineId.PHONE_1
+    return BusinessPhonesConfig(
+      activeDeviceLine = activeLine,
+      phone1Label = prefs.getString(KEY_PHONE_1_LABEL, defaults.phone1Label) ?: defaults.phone1Label,
+      phone1Number = prefs.getString(KEY_PHONE_1_NUMBER, defaults.phone1Number) ?: defaults.phone1Number,
+      phone2Label = prefs.getString(KEY_PHONE_2_LABEL, defaults.phone2Label) ?: defaults.phone2Label,
+      phone2Number = prefs.getString(KEY_PHONE_2_NUMBER, defaults.phone2Number) ?: defaults.phone2Number,
+      crossPhoneAlertsEnabled = prefs.getBoolean(KEY_CROSS_PHONE_ALERTS, defaults.crossPhoneAlertsEnabled),
+      phone1Verified = prefs.getBoolean(KEY_PHONE_1_VERIFIED, defaults.phone1Verified),
+      phone1VerifiedAt = prefs.getLong(KEY_PHONE_1_VERIFIED_AT, defaults.phone1VerifiedAt),
+      phone2Verified = prefs.getBoolean(KEY_PHONE_2_VERIFIED, defaults.phone2Verified),
+      phone2VerifiedAt = prefs.getLong(KEY_PHONE_2_VERIFIED_AT, defaults.phone2VerifiedAt),
+      verifiedMethod = prefs.getString(KEY_VERIFIED_METHOD, defaults.verifiedMethod) ?: defaults.verifiedMethod
+    )
+  }
+
+  fun hasNotifiedRemoteCall(context: Context, key: String): Boolean {
+    val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    val set = prefs.getStringSet(KEY_NOTIFIED_REMOTE_KEYS, emptySet()) ?: emptySet()
+    return set.contains(key)
+  }
+
+  fun markRemoteCallNotified(context: Context, key: String) {
+    val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    val existing = prefs.getStringSet(KEY_NOTIFIED_REMOTE_KEYS, emptySet())?.toMutableSet() ?: mutableSetOf()
+    existing.add(key)
+    if (existing.size > 100) {
+      val trimmed = existing.toList().takeLast(60).toSet()
+      prefs.edit().putStringSet(KEY_NOTIFIED_REMOTE_KEYS, trimmed).apply()
+    } else {
+      prefs.edit().putStringSet(KEY_NOTIFIED_REMOTE_KEYS, existing).apply()
+    }
+  }
 
   fun saveChatGptConfig(context: Context, config: ChatGptConfig) {
     context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()

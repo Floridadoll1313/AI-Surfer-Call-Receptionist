@@ -14,6 +14,7 @@ import androidx.work.WorkerParameters
 import com.example.OceanSurferApp
 import com.example.data.AppRepository
 import com.example.data.local.AppDatabase
+import com.example.telephony.CallEscalationManager
 import java.util.concurrent.TimeUnit
 
 class SupabaseCallSyncWorker(
@@ -41,7 +42,30 @@ class SupabaseCallSyncWorker(
     val pullResult = SupabaseClient.fetchCalls(config)
     val remoteCalls = pullResult.getOrNull()
     if (remoteCalls != null) {
-      repo.reconcileRemoteCalls(remoteCalls)
+      val reconcile = repo.reconcileRemoteCallsDetailed(remoteCalls)
+      val phonesCfg = IntegrationPrefsStore.loadBusinessPhonesConfig(applicationContext)
+      val escCfg = IntegrationPrefsStore.loadEscalationConfig(applicationContext)
+      if (phonesCfg.crossPhoneAlertsEnabled && escCfg.isEnabled && escCfg.alertChannel != EscalationAlertChannel.EMAIL) {
+        for (call in reconcile.newlyArrivedCalls) {
+          val notifyKey = "${call.callerNumber}_${call.timestamp}_${call.receivingLine}"
+          if (IntegrationPrefsStore.hasNotifiedRemoteCall(applicationContext, notifyKey)) continue
+          val isFromOtherPhone = call.receivingLine != phonesCfg.activeDeviceLine.id
+          if (isFromOtherPhone || call.isEscalated || call.status == "ESCALATED") {
+            IntegrationPrefsStore.markRemoteCallNotified(applicationContext, notifyKey)
+            val lineDisplay = phonesCfg.displayLabelFor(call.receivingLine)
+            CallEscalationManager.triggerEscalationAlert(
+              context = applicationContext,
+              call = call,
+              urgencyReason = if (isFromOtherPhone) {
+                "Real call synced from $lineDisplay"
+              } else {
+                call.escalationNotes.ifBlank { "Real escalated call on $lineDisplay" }
+              },
+              targetEmail = escCfg.targetEmail
+            )
+          }
+        }
+      }
     }
 
     return if (pendingFailure && runAttemptCount < 5) Result.retry() else Result.success()

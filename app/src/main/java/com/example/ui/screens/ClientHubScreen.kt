@@ -59,8 +59,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.ai.AiInstrumentTool
 import com.example.ai.GeminiAdvisorUiState
 import com.example.ui.OceanSurferViewModel
+import com.example.ui.components.AiInstrumentsSelectorRow
+import com.example.ui.components.AiInstrumentsStudio
 import com.example.ui.components.OceanWaveHeader
 import com.example.ui.theme.OceanTheme
 
@@ -74,6 +77,7 @@ fun ClientHubScreen(
   val colors = OceanTheme.colors
   val scrollState = rememberScrollState()
   val advisorState by viewModel.geminiAdvisorState.collectAsStateWithLifecycle()
+  val selectedTool by viewModel.selectedAiInstrument.collectAsStateWithLifecycle()
   val clientLeads by viewModel.clientLeads.collectAsStateWithLifecycle()
 
   var advisorInput by remember { mutableStateOf("") }
@@ -113,11 +117,18 @@ fun ClientHubScreen(
         .padding(16.dp),
       verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-      // 1. Live Gemini AI Wave Advisor Card (Streaming Firebase AI Logic)
-      Card(
-        modifier = Modifier
-          .fillMaxWidth()
-          .testTag("client_ai_advisor_card"),
+      // 0. 7-Instrument AI Studio Selector
+      AiInstrumentsSelectorRow(
+        selectedTool = selectedTool,
+        onSelectTool = { tool -> viewModel.selectAiInstrument(tool) }
+      )
+
+      if (selectedTool == AiInstrumentTool.WAVE_ADVISOR) {
+        // 1. Live Gemini AI Wave Advisor Card (Streaming Firebase AI Logic)
+        Card(
+          modifier = Modifier
+            .fillMaxWidth()
+            .testTag("client_ai_advisor_card"),
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = colors.deepBlue),
         border = BorderStroke(1.dp, colors.turquoise.copy(alpha = 0.5f))
@@ -301,6 +312,13 @@ fun ClientHubScreen(
             }
           }
         }
+      }
+      } else {
+        AiInstrumentsStudio(
+          selectedTool = selectedTool,
+          viewModel = viewModel,
+          selectedBottleneck = selectedBottleneck
+        )
       }
 
       // 2. Client Wave Check Lead Intake -> Supabase (public.wave_audit_leads)

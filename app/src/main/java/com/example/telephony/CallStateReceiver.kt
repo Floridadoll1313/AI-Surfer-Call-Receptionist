@@ -214,6 +214,9 @@ class CallStateReceiver : BroadcastReceiver() {
       )
 
       val escalationConfig = IntegrationPrefsStore.loadEscalationConfig(context)
+      val phonesConfig = IntegrationPrefsStore.loadBusinessPhonesConfig(context)
+      val activeLineId = phonesConfig.activeDeviceLine.id
+      val activeLineDisplay = phonesConfig.activeLineDisplay()
       val shouldEscalate = aiResult.requiresImmediateEscalation ||
         (escalationConfig.escalateOnHighUrgency && aiResult.urgency == "HIGH")
       val alertMinutes = if (shouldEscalate) 3 else 5
@@ -229,7 +232,7 @@ class CallStateReceiver : BroadcastReceiver() {
         urgency = aiResult.urgency,
         topic = aiResult.topic,
         summary = aiResult.summary,
-        transcription = "Gemini Flash Call Workflow\nQuestion/Transcript: $questionOrTranscript\nAI Summary: ${aiResult.summary}",
+        transcription = "Real Cell Call ($activeLineDisplay)\nNotes: $questionOrTranscript\nAI Summary: ${aiResult.summary}\n[Line: $activeLineId]",
         customerQuestion = questionOrTranscript,
         aiResponse = aiResult.responseText,
         escalationAlertMinutes = alertMinutes,
@@ -237,8 +240,9 @@ class CallStateReceiver : BroadcastReceiver() {
         isEscalated = shouldEscalate,
         escalatedAt = if (shouldEscalate) now else 0L,
         escalationNotes = if (shouldEscalate) {
-          aiResult.escalationReason.ifBlank { "Gemini Flash flagged incoming call for immediate escalation." }
-        } else ""
+          aiResult.escalationReason.ifBlank { "AI flagged real call on $activeLineDisplay for escalation." }
+        } else "",
+        receivingLine = activeLineId
       )
 
       // Step 2: Save the Gemini-summarized call to Supabase BEFORE/WITH local persistence
@@ -272,6 +276,14 @@ class CallStateReceiver : BroadcastReceiver() {
           targetEmail = escalationConfig.targetEmail,
           sendNotification = sendNotification,
           webhookUrl = escalationConfig.webhookUrl
+        )
+      } else if (escalationConfig.isEnabled && escalationConfig.alertChannel != com.example.integrations.EscalationAlertChannel.EMAIL) {
+        // Real incoming call alert notification on the device for every real call logged
+        CallEscalationManager.triggerEscalationAlert(
+          context = context,
+          call = savedCall,
+          urgencyReason = "Real call received on $activeLineDisplay (${durationSeconds}s)",
+          targetEmail = escalationConfig.targetEmail
         )
       }
 

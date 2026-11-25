@@ -60,12 +60,18 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.ai.ReceptionistResult
+import com.example.ai.SurferAiReceptionist
 import com.example.data.local.FaqEntity
 import com.example.data.local.ProductEntity
 import com.example.ui.OceanSurferViewModel
 import com.example.ui.components.OceanWaveHeader
 import com.example.ui.theme.OceanTheme
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -77,10 +83,39 @@ fun ProductsScreen(
   val colors = OceanTheme.colors
   val products by viewModel.products.collectAsStateWithLifecycle()
   val faqs by viewModel.faqs.collectAsStateWithLifecycle()
+  val chatGptConfig by viewModel.chatGptConfig.collectAsStateWithLifecycle()
+  val coroutineScope = rememberCoroutineScope()
 
   var selectedTab by remember { mutableIntStateOf(0) } // 0: Products, 1: Business FAQ
   var showAddProductDialog by remember { mutableStateOf(false) }
   var showAddFaqDialog by remember { mutableStateOf(false) }
+  var previewTitle by remember { mutableStateOf("") }
+  var previewQuestion by remember { mutableStateOf("") }
+  var previewResult by remember { mutableStateOf<ReceptionistResult?>(null) }
+  var isPreviewLoading by remember { mutableStateOf(false) }
+  var showPreviewDialog by remember { mutableStateOf(false) }
+
+  fun openAiPreview(title: String, question: String) {
+    previewTitle = title
+    previewQuestion = question
+    previewResult = null
+    isPreviewLoading = true
+    showPreviewDialog = true
+    coroutineScope.launch {
+      val result = SurferAiReceptionist.processCallerQuestion(
+        callerName = "Knowledge Preview",
+        callerNumber = "",
+        question = question,
+        products = products,
+        faqs = faqs,
+        openAiApiKey = chatGptConfig.apiKey,
+        modelName = chatGptConfig.model,
+        useOpenAi = chatGptConfig.isEnabled
+      )
+      previewResult = result
+      isPreviewLoading = false
+    }
+  }
 
   // Add Product form state
   var newName by remember { mutableStateOf("") }
@@ -215,10 +250,9 @@ fun ProductsScreen(
             ProductItemCard(
               product = product,
               onAskAi = {
-                viewModel.simulateIncomingCall(
-                  callerName = "Prospective Client",
-                  callerNumber = "+1 (555) 789-WAVE",
-                  initialQuery = "Aloha! I saw ${product.name} on otdaisurfer.surf. Can you tell me what it includes and how it works?"
+                openAiPreview(
+                  title = product.name,
+                  question = "Tell a prospective client what ${product.name} includes, pricing, and next steps on otdaisurfer.surf."
                 )
               },
               onOpenLink = { url ->
@@ -244,10 +278,9 @@ fun ProductsScreen(
             FaqItemCard(
               faq = faq,
               onAskAi = {
-                viewModel.simulateIncomingCall(
-                  callerName = "Curious Surfer",
-                  callerNumber = "+1 (555) 432-WAVE",
-                  initialQuery = faq.question
+                openAiPreview(
+                  title = "FAQ: ${faq.category}",
+                  question = faq.question
                 )
               }
             )
@@ -440,6 +473,53 @@ fun ProductsScreen(
       }
     )
   }
+
+  if (showPreviewDialog) {
+    AlertDialog(
+      onDismissRequest = { showPreviewDialog = false },
+      containerColor = colors.deepBlue,
+      title = {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+          Icon(imageVector = Icons.Default.AutoAwesome, contentDescription = null, tint = colors.turquoise)
+          Spacer(modifier = Modifier.width(8.dp))
+          Text(previewTitle.ifBlank { "AI Answer Preview" }, color = colors.textPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+        }
+      },
+      text = {
+        Column {
+          Text(
+            text = "Preview only — does not log a fake call or trigger alerts.",
+            color = colors.cyan,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold
+          )
+          Spacer(modifier = Modifier.height(8.dp))
+          if (isPreviewLoading) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+              CircularProgressIndicator(modifier = Modifier.size(18.dp), color = colors.turquoise, strokeWidth = 2.dp)
+              Spacer(modifier = Modifier.width(8.dp))
+              Text("Preparing Kai's reply...", color = colors.textSecondary, fontSize = 12.sp)
+            }
+          } else {
+            Text(
+              text = previewResult?.responseText.orEmpty(),
+              color = colors.textPrimary,
+              fontSize = 13.sp,
+              lineHeight = 18.sp
+            )
+          }
+        }
+      },
+      confirmButton = {
+        Button(
+          onClick = { showPreviewDialog = false },
+          colors = ButtonDefaults.buttonColors(containerColor = colors.turquoise)
+        ) {
+          Text("Done", color = colors.abyss, fontWeight = FontWeight.Bold)
+        }
+      }
+    )
+  }
 }
 
 @Composable
@@ -614,7 +694,7 @@ fun FaqItemCard(
       ) {
         Icon(imageVector = Icons.Default.QuestionAnswer, contentDescription = null, tint = colors.turquoise, modifier = Modifier.size(16.dp))
         Spacer(modifier = Modifier.width(6.dp))
-        Text("Simulate Call Inquiring About This", color = colors.turquoise, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        Text("Preview AI Answer", color = colors.turquoise, fontSize = 11.sp, fontWeight = FontWeight.Bold)
       }
     }
   }

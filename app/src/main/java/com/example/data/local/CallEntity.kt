@@ -23,5 +23,6 @@ data class CallEntity(
   val isEscalated: Boolean = false,
   val escalatedAt: Long = 0L,
   val escalationNotes: String = "",
-  val supabaseSynced: Boolean = false
+  val supabaseSynced: Boolean = false,
+  val receivingLine: String = "PHONE_1"
 )

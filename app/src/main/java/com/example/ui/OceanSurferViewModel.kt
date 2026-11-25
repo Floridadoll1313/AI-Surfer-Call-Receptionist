@@ -1,18 +1,33 @@
 package com.example.ui
 
 import android.content.Context
+import android.graphics.Bitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.ai.AiInstrumentTool
+import com.example.ai.AiInstrumentsEngine
+import com.example.ai.CallQueueBriefUiState
+import com.example.ai.CopilotChatMessage
 import com.example.ai.GeminiAdvisorUiState
 import com.example.ai.GeminiAiService
+import com.example.ai.ImageGenUiState
+import com.example.ai.InstrumentTextUiState
+import com.example.ai.PitchBriefUiState
 import com.example.ai.ReceptionistResult
 import com.example.ai.SurferAiReceptionist
+import com.example.auth.GoogleAccountUiState
+import com.example.auth.GoogleSignInManager
+import com.example.auth.PhoneVerificationManager
+import com.example.auth.PhoneVerificationStage
+import com.example.auth.PhoneVerificationUiState
 import com.example.data.AppRepository
 import com.example.data.local.CallEntity
 import com.example.data.local.FaqEntity
 import com.example.data.local.ProductEntity
 import com.example.data.local.WaveAuditLeadEntity
+import com.example.integrations.BusinessLineId
+import com.example.integrations.BusinessPhonesConfig
 import com.example.integrations.ChatGptConfig
 import com.example.integrations.EscalationAlertChannel
 import com.example.integrations.EscalationTriggerConfig
@@ -23,7 +38,9 @@ import com.example.integrations.SupabaseClient
 import com.example.integrations.SupabaseConfig
 import com.example.integrations.SupabaseConnectionState
 import com.example.integrations.SupabaseWaveAuditLeadDto
+import com.example.integrations.TeamSetupCodec
 import com.example.integrations.WaveAuditLead
+import com.example.telephony.CallEscalationManager
 import com.example.ui.components.CallDateFilter
 import com.example.ui.components.CallStatusFilter
 import com.example.ui.theme.OceanPalette
@@ -38,22 +55,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-
-data class ActiveCallUiState(
-  val isInCall: Boolean = false,
-  val isRinging: Boolean = false,
-  val callerName: String = "",
-  val callerNumber: String = "",
-  val currentCustomerQuery: String = "",
-  val currentAiResponse: String = "",
-  val isAiThinking: Boolean = false,
-  val callDurationSeconds: Int = 0,
-  val isFlaggedForEscalation: Boolean = false,
-  val escalationReason: String = "",
-  val returningContextBadge: String = "",
-  val returningContextPrompt: String = "",
-  val audioWaveHeights: List<Float> = listOf(0.3f, 0.6f, 0.9f, 0.4f, 0.8f, 0.5f, 0.7f, 0.3f)
-)
 
 class OceanSurferViewModel(
   private val repository: AppRepository,
@@ -75,14 +76,14 @@ class OceanSurferViewModel(
   val faqs: StateFlow<List<FaqEntity>> = repository.allFaqs
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-  private val _activeCall = MutableStateFlow(ActiveCallUiState())
-  val activeCall: StateFlow<ActiveCallUiState> = _activeCall.asStateFlow()
-
   private val _chatGptConfig = MutableStateFlow(IntegrationPrefsStore.loadChatGptConfig(appContext))
   val chatGptConfig: StateFlow<ChatGptConfig> = _chatGptConfig.asStateFlow()
 
   private val _supabaseConfig = MutableStateFlow(IntegrationPrefsStore.loadSupabaseConfig(appContext))
   val supabaseConfig: StateFlow<SupabaseConfig> = _supabaseConfig.asStateFlow()
+
+  private val _businessPhonesConfig = MutableStateFlow(IntegrationPrefsStore.loadBusinessPhonesConfig(appContext))
+  val businessPhonesConfig: StateFlow<BusinessPhonesConfig> = _businessPhonesConfig.asStateFlow()
 
   private val _isFetchingFromSupabase = MutableStateFlow(false)
   val isFetchingFromSupabase: StateFlow<Boolean> = _isFetchingFromSupabase.asStateFlow()
@@ -117,6 +118,9 @@ class OceanSurferViewModel(
   private val _customDateRange = MutableStateFlow<Pair<Long?, Long?>>(null to null)
   val customDateRange: StateFlow<Pair<Long?, Long?>> = _customDateRange.asStateFlow()
 
+  private val _selectedPhoneLineFilter = MutableStateFlow(BusinessLineId.ALL)
+  val selectedPhoneLineFilter: StateFlow<BusinessLineId> = _selectedPhoneLineFilter.asStateFlow()
+
   private val _supabaseConnectionState = MutableStateFlow<SupabaseConnectionState>(SupabaseConnectionState.Idle)
   val supabaseConnectionState: StateFlow<SupabaseConnectionState> = _supabaseConnectionState.asStateFlow()
 
@@ -125,6 +129,112 @@ class OceanSurferViewModel(
 
   private val _selectedPalette = MutableStateFlow(IntegrationPrefsStore.loadOceanPalette(appContext))
   val selectedPalette: StateFlow<OceanPalette> = _selectedPalette.asStateFlow()
+
+  private val _phoneVerificationState = MutableStateFlow(PhoneVerificationUiState())
+  val phoneVerificationState: StateFlow<PhoneVerificationUiState> = _phoneVerificationState.asStateFlow()
+
+  private val _selectedAiInstrument = MutableStateFlow(AiInstrumentTool.WAVE_ADVISOR)
+  val selectedAiInstrument: StateFlow<AiInstrumentTool> = _selectedAiInstrument.asStateFlow()
+
+  private val _copilotMessages = MutableStateFlow(
+    listOf(
+      CopilotChatMessage(
+        isFromUser = false,
+        text = "Aloha! I'm Kai Copilot (gemini-3.8-flash). Ask me anything about Ocean Tide Drop AI workflows, call scripts, or client ROI."
+      )
+    )
+  )
+  val copilotMessages: StateFlow<List<CopilotChatMessage>> = _copilotMessages.asStateFlow()
+
+  private val _isCopilotSending = MutableStateFlow(false)
+  val isCopilotSending: StateFlow<Boolean> = _isCopilotSending.asStateFlow()
+
+  private val _copilotError = MutableStateFlow<String?>(null)
+  val copilotError: StateFlow<String?> = _copilotError.asStateFlow()
+
+  private val _visionResultState = MutableStateFlow<InstrumentTextUiState>(InstrumentTextUiState.Idle)
+  val visionResultState: StateFlow<InstrumentTextUiState> = _visionResultState.asStateFlow()
+
+  private val _imageGenState = MutableStateFlow<ImageGenUiState>(ImageGenUiState.Idle)
+  val imageGenState: StateFlow<ImageGenUiState> = _imageGenState.asStateFlow()
+
+  private val _pitchBriefState = MutableStateFlow<PitchBriefUiState>(PitchBriefUiState.Idle)
+  val pitchBriefState: StateFlow<PitchBriefUiState> = _pitchBriefState.asStateFlow()
+
+  private val _callQueueBriefState = MutableStateFlow<CallQueueBriefUiState>(CallQueueBriefUiState.Idle)
+  val callQueueBriefState: StateFlow<CallQueueBriefUiState> = _callQueueBriefState.asStateFlow()
+
+  private val _translatorState = MutableStateFlow<InstrumentTextUiState>(InstrumentTextUiState.Idle)
+  val translatorState: StateFlow<InstrumentTextUiState> = _translatorState.asStateFlow()
+
+  private val _googleAccountState = MutableStateFlow(
+    GoogleSignInManager.toUiState(GoogleSignInManager.currentUser(appContext))
+  )
+  val googleAccountState: StateFlow<GoogleAccountUiState> = _googleAccountState.asStateFlow()
+
+  init {
+    viewModelScope.launch {
+      GoogleSignInManager.authStateFlow(appContext).collect { user ->
+        _googleAccountState.value = GoogleSignInManager.toUiState(
+          user = user,
+          isLoading = false,
+          errorMessage = if (user != null) null else _googleAccountState.value.errorMessage
+        )
+      }
+    }
+  }
+
+  fun onGoogleAuthLoading(loading: Boolean) {
+    _googleAccountState.value = _googleAccountState.value.copy(
+      isLoading = loading,
+      errorMessage = if (loading) null else _googleAccountState.value.errorMessage
+    )
+  }
+
+  fun onGoogleAuthSuccess(user: com.google.firebase.auth.FirebaseUser?, showSnackbar: Boolean = true) {
+    _googleAccountState.value = GoogleSignInManager.toUiState(
+      user = user,
+      isLoading = false,
+      errorMessage = null
+    )
+    if (showSnackbar && user != null) {
+      val identity = user.email?.takeIf { it.isNotBlank() } ?: user.displayName ?: "Google Account"
+      _snackbarMessage.value = "Signed in as $identity!"
+    }
+  }
+
+  fun onGoogleAuthCancelled() {
+    _googleAccountState.value = _googleAccountState.value.copy(
+      isLoading = false,
+      errorMessage = "Sign-in was cancelled. Tip: On Google's sign-in page, sign in with your Gmail address (not your phone number), or add your Google Account in Android Settings -> Accounts first."
+    )
+  }
+
+  fun onGoogleAuthError(message: String) {
+    _googleAccountState.value = _googleAccountState.value.copy(
+      isLoading = false,
+      errorMessage = message
+    )
+    _snackbarMessage.value = message
+  }
+
+  fun clearGoogleAuthError() {
+    _googleAccountState.value = _googleAccountState.value.copy(errorMessage = null)
+  }
+
+  fun onGoogleSignedOut() {
+    _googleAccountState.value = GoogleAccountUiState()
+    _snackbarMessage.value = "Signed out of Google Account."
+  }
+
+  fun useSignedInGoogleEmailForAlerts() {
+    val email = _googleAccountState.value.email.trim()
+    if (email.isBlank()) {
+      _snackbarMessage.value = "Sign in with Google first to use your Google email."
+      return
+    }
+    updateEscalationTriggerConfig(targetEmail = email)
+  }
 
   fun selectOceanPalette(palette: OceanPalette) {
     if (_selectedPalette.value == palette) return
@@ -155,9 +265,7 @@ class OceanSurferViewModel(
     }
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-  private val voiceController = VoiceReceptionistController(appContext) { transcript ->
-    processQuestionInCall(transcript)
-  }
+  private val voiceController = VoiceReceptionistController(appContext) { _ -> }
   val voiceUiState: StateFlow<VoiceUiState> = voiceController.uiState
 
   private var advisorJob: Job? = null
@@ -203,11 +311,278 @@ class OceanSurferViewModel(
     _customDateRange.value = startUtcMillis to endUtcMillis
   }
 
+  fun setPhoneLineFilter(line: BusinessLineId) {
+    _selectedPhoneLineFilter.value = line
+  }
+
   fun clearCallFilters() {
     _callSearchQuery.value = ""
     _selectedDateFilter.value = CallDateFilter.ALL
-    _customDateRange.value = null to null
+    _customDateFilterReset()
     _selectedStatusFilter.value = CallStatusFilter.ALL
+    _selectedPhoneLineFilter.value = BusinessLineId.ALL
+  }
+
+  private fun _customDateFilterReset() {
+    _customDateRange.value = null to null
+  }
+
+  fun setActiveDeviceLine(line: BusinessLineId) {
+    val resolved = if (line == BusinessLineId.PHONE_2) BusinessLineId.PHONE_2 else BusinessLineId.PHONE_1
+    val updated = _businessPhonesConfig.value.copy(activeDeviceLine = resolved)
+    _businessPhonesConfig.value = updated
+    IntegrationPrefsStore.saveBusinessPhonesConfig(appContext, updated)
+    _snackbarMessage.value = "This phone is now set as ${updated.activeLineDisplay()}."
+  }
+
+  fun updateBusinessPhonesConfig(
+    activeDeviceLine: BusinessLineId = _businessPhonesConfig.value.activeDeviceLine,
+    phone1Label: String = _businessPhonesConfig.value.phone1Label,
+    phone1Number: String = _businessPhonesConfig.value.phone1Number,
+    phone2Label: String = _businessPhonesConfig.value.phone2Label,
+    phone2Number: String = _businessPhonesConfig.value.phone2Number,
+    crossPhoneAlertsEnabled: Boolean = _businessPhonesConfig.value.crossPhoneAlertsEnabled
+  ) {
+    val current = _businessPhonesConfig.value
+    val resolvedLine = if (activeDeviceLine == BusinessLineId.PHONE_2) BusinessLineId.PHONE_2 else BusinessLineId.PHONE_1
+    val cleanNum1 = phone1Number.trim()
+    val cleanNum2 = phone2Number.trim()
+    val p1Same = PhoneVerificationManager.normalizeToE164(cleanNum1) ==
+      PhoneVerificationManager.normalizeToE164(current.phone1Number)
+    val p2Same = PhoneVerificationManager.normalizeToE164(cleanNum2) ==
+      PhoneVerificationManager.normalizeToE164(current.phone2Number)
+    val updated = current.copy(
+      activeDeviceLine = resolvedLine,
+      phone1Label = phone1Label.trim().ifBlank { "Main Business Cell" },
+      phone1Number = cleanNum1,
+      phone2Label = phone2Label.trim().ifBlank { "Secondary / Backup Cell" },
+      phone2Number = cleanNum2,
+      crossPhoneAlertsEnabled = crossPhoneAlertsEnabled,
+      phone1Verified = if (p1Same) current.phone1Verified else false,
+      phone1VerifiedAt = if (p1Same) current.phone1VerifiedAt else 0L,
+      phone2Verified = if (p2Same) current.phone2Verified else false,
+      phone2VerifiedAt = if (p2Same) current.phone2VerifiedAt else 0L
+    )
+    _businessPhonesConfig.value = updated
+    IntegrationPrefsStore.saveBusinessPhonesConfig(appContext, updated)
+    _snackbarMessage.value = "Saved 2-phone setup (${updated.activeLineDisplay()})."
+  }
+
+  // --- Phone Verification Actions ---
+
+  fun selectVerificationLine(line: BusinessLineId) {
+    val resolved = if (line == BusinessLineId.PHONE_2) BusinessLineId.PHONE_2 else BusinessLineId.PHONE_1
+    _phoneVerificationState.value = PhoneVerificationUiState(targetLine = resolved)
+  }
+
+  fun startFirebaseSmsVerification(uiContext: Context, line: BusinessLineId, rawNumber: String) {
+    val resolvedLine = if (line == BusinessLineId.PHONE_2) BusinessLineId.PHONE_2 else BusinessLineId.PHONE_1
+    val e164 = PhoneVerificationManager.normalizeToE164(rawNumber)
+    if (!PhoneVerificationManager.isValidE164(e164)) {
+      _phoneVerificationState.value = PhoneVerificationUiState(
+        targetLine = resolvedLine,
+        stage = PhoneVerificationStage.Error("Enter a valid phone number with area code (e.g. (808) 555-1234).")
+      )
+      return
+    }
+    _phoneVerificationState.value = PhoneVerificationUiState(
+      targetLine = resolvedLine,
+      stage = PhoneVerificationStage.SendingCode(e164),
+      pendingPhoneNumber = e164
+    )
+    PhoneVerificationManager.startFirebasePhoneVerification(
+      context = uiContext,
+      rawPhoneNumber = e164,
+      onCodeSent = { verificationId ->
+        _phoneVerificationState.value = PhoneVerificationUiState(
+          targetLine = resolvedLine,
+          stage = PhoneVerificationStage.CodeSent(
+            phoneNumber = e164,
+            verificationId = verificationId,
+            isLocalPinMode = false,
+            message = "6-digit SMS verification code sent to $e164."
+          ),
+          pendingPhoneNumber = e164
+        )
+      },
+      onAutoVerified = { credential, verifiedNum ->
+        viewModelScope.launch {
+          _phoneVerificationState.value = _phoneVerificationState.value.copy(
+            stage = PhoneVerificationStage.Verifying
+          )
+          val res = PhoneVerificationManager.completeFirebasePhoneCredential(uiContext, credential)
+          if (res.isSuccess) {
+            markPhoneVerified(resolvedLine, res.getOrNull().orEmpty().ifBlank { verifiedNum }, "Firebase SMS")
+          } else {
+            _phoneVerificationState.value = _phoneVerificationState.value.copy(
+              stage = PhoneVerificationStage.Error(
+                res.exceptionOrNull()?.localizedMessage ?: "Firebase phone verification failed."
+              )
+            )
+          }
+        }
+      },
+      onFailed = { errorMsg ->
+        _phoneVerificationState.value = PhoneVerificationUiState(
+          targetLine = resolvedLine,
+          stage = PhoneVerificationStage.Error(errorMsg),
+          pendingPhoneNumber = e164
+        )
+      }
+    )
+  }
+
+  fun startTwoPhonePinVerification(uiContext: Context, line: BusinessLineId, rawNumber: String) {
+    val resolvedLine = if (line == BusinessLineId.PHONE_2) BusinessLineId.PHONE_2 else BusinessLineId.PHONE_1
+    val e164 = PhoneVerificationManager.normalizeToE164(rawNumber)
+    if (!PhoneVerificationManager.isValidE164(e164)) {
+      _phoneVerificationState.value = PhoneVerificationUiState(
+        targetLine = resolvedLine,
+        stage = PhoneVerificationStage.Error("Enter a valid phone number with area code first.")
+      )
+      return
+    }
+    val pin = PhoneVerificationManager.generateSixDigitPin()
+    val lineLabel = _businessPhonesConfig.value.displayLabelFor(resolvedLine.id)
+    val smsIntent = PhoneVerificationManager.createSmsVerificationIntent(e164, pin, lineLabel)
+    try {
+      uiContext.startActivity(smsIntent)
+      _phoneVerificationState.value = PhoneVerificationUiState(
+        targetLine = resolvedLine,
+        stage = PhoneVerificationStage.CodeSent(
+          phoneNumber = e164,
+          verificationId = null,
+          isLocalPinMode = true,
+          message = "Send the pre-filled SMS to $e164, then enter the 6-digit PIN from that phone."
+        ),
+        pendingPinHash = pin,
+        pendingPhoneNumber = e164
+      )
+    } catch (_: Exception) {
+      _phoneVerificationState.value = PhoneVerificationUiState(
+        targetLine = resolvedLine,
+        stage = PhoneVerificationStage.Error("No SMS app is installed on this device. Use Firebase SMS verification on a phone with Play Services.")
+      )
+    }
+  }
+
+  fun submitPhoneVerificationCode(uiContext: Context, rawCode: String) {
+    val currentState = _phoneVerificationState.value
+    val code = rawCode.trim()
+    if (code.length < 6) {
+      _phoneVerificationState.value = currentState.copy(
+        stage = PhoneVerificationStage.Error("Enter the complete 6-digit verification code.")
+      )
+      return
+    }
+    val stage = currentState.stage as? PhoneVerificationStage.CodeSent ?: return
+
+    if (stage.isLocalPinMode) {
+      if (code == currentState.pendingPinHash) {
+        markPhoneVerified(currentState.targetLine, stage.phoneNumber, "2-Phone SMS PIN")
+      } else {
+        _phoneVerificationState.value = currentState.copy(
+          stage = PhoneVerificationStage.Error("Verification PIN does not match. Check the SMS sent to ${stage.phoneNumber}.")
+        )
+      }
+      return
+    }
+
+    val verificationId = stage.verificationId
+    if (verificationId.isNullOrBlank()) {
+      _phoneVerificationState.value = currentState.copy(
+        stage = PhoneVerificationStage.Error("Verification session expired. Request a new code.")
+      )
+      return
+    }
+    _phoneVerificationState.value = currentState.copy(stage = PhoneVerificationStage.Verifying)
+    viewModelScope.launch {
+      val credential = com.google.firebase.auth.PhoneAuthProvider.getCredential(verificationId, code)
+      val res = PhoneVerificationManager.completeFirebasePhoneCredential(uiContext, credential)
+      if (res.isSuccess) {
+        markPhoneVerified(currentState.targetLine, res.getOrNull().orEmpty().ifBlank { stage.phoneNumber }, "Firebase SMS")
+      } else {
+        _phoneVerificationState.value = currentState.copy(
+          stage = PhoneVerificationStage.Error(
+            res.exceptionOrNull()?.localizedMessage ?: "Verification code invalid or expired."
+          )
+        )
+      }
+    }
+  }
+
+  fun markPhoneVerified(line: BusinessLineId, normalizedNumber: String, method: String) {
+    val now = System.currentTimeMillis()
+    val current = _businessPhonesConfig.value
+    val updated = if (line == BusinessLineId.PHONE_2) {
+      current.copy(
+        phone2Number = normalizedNumber.ifBlank { current.phone2Number },
+        phone2Verified = true,
+        phone2VerifiedAt = now,
+        verifiedMethod = method
+      )
+    } else {
+      current.copy(
+        phone1Number = normalizedNumber.ifBlank { current.phone1Number },
+        phone1Verified = true,
+        phone1VerifiedAt = now,
+        verifiedMethod = method
+      )
+    }
+    _businessPhonesConfig.value = updated
+    IntegrationPrefsStore.saveBusinessPhonesConfig(appContext, updated)
+    _phoneVerificationState.value = PhoneVerificationUiState(
+      targetLine = line,
+      stage = PhoneVerificationStage.Verified(
+        line = line,
+        phoneNumber = normalizedNumber,
+        method = method,
+        verifiedAt = now
+      ),
+      pendingPhoneNumber = normalizedNumber
+    )
+    _snackbarMessage.value = "${line.shortLabel} verified ($method)!"
+  }
+
+  fun resetPhoneVerification() {
+    val line = _phoneVerificationState.value.targetLine
+    _phoneVerificationState.value = PhoneVerificationUiState(targetLine = line)
+  }
+
+  fun applyTeamSetupCode(rawCode: String): Boolean {
+    val bundle = TeamSetupCodec.decode(rawCode)
+    if (bundle == null) {
+      _snackbarMessage.value = "Invalid Team Connect Code. Copy the code from your first phone and try again."
+      return false
+    }
+    val updatedSupabase = _supabaseConfig.value.copy(
+      projectUrl = bundle.supabaseUrl,
+      anonKey = bundle.supabaseKey.ifBlank { _supabaseConfig.value.anonKey }
+    )
+    _supabaseConfig.value = updatedSupabase
+    IntegrationPrefsStore.saveSupabaseConfig(appContext, updatedSupabase)
+
+    val updatedPhones = _businessPhonesConfig.value.copy(
+      phone1Label = bundle.phone1Label,
+      phone1Number = bundle.phone1Number,
+      phone2Label = bundle.phone2Label,
+      phone2Number = bundle.phone2Number,
+      crossPhoneAlertsEnabled = true
+    )
+    _businessPhonesConfig.value = updatedPhones
+    IntegrationPrefsStore.saveBusinessPhonesConfig(appContext, updatedPhones)
+
+    val updatedEscalation = _escalationTriggerConfig.value.copy(
+      targetEmail = bundle.alertEmail,
+      webhookUrl = bundle.webhookUrl
+    )
+    _escalationTriggerConfig.value = updatedEscalation
+    IntegrationPrefsStore.saveEscalationConfig(appContext, updatedEscalation)
+
+    _snackbarMessage.value = "Team Connect Code applied! Connecting shared Supabase sync..."
+    testSupabaseConnection()
+    fetchCallsFromSupabase()
+    return true
   }
 
   fun dismissCallAlert() {
@@ -240,25 +615,34 @@ class OceanSurferViewModel(
     _snackbarMessage.value = "AI Escalation trigger updated (${alertChannel.label}$webhookSuffix)."
   }
 
-  private var callTimerJob: Job? = null
-  private var waveAnimationJob: Job? = null
+  private fun notifyForNewRemoteCalls(newlyArrived: List<CallEntity>) {
+    if (newlyArrived.isEmpty()) return
+    val phonesCfg = _businessPhonesConfig.value
+    val escCfg = _escalationTriggerConfig.value
+    if (!phonesCfg.crossPhoneAlertsEnabled || !escCfg.isEnabled) return
+    if (escCfg.alertChannel == EscalationAlertChannel.EMAIL) return
 
-  init {
-    startEscalationMonitor()
-    autoSyncOfficialCatalog()
-    startForegroundSupabaseSyncLoop()
-  }
-
-  private fun autoSyncOfficialCatalog() {
-    viewModelScope.launch {
-      repository.forceSyncOfficialProducts()
-    }
-  }
-
-  fun syncProductsFromWebsite() {
-    viewModelScope.launch {
-      repository.forceSyncOfficialProducts()
-      _snackbarMessage.value = "Synced 12 official products & FAQs from https://otdaisurfer.surf!"
+    for (call in newlyArrived) {
+      val notifyKey = "${call.callerNumber}_${call.timestamp}_${call.receivingLine}"
+      if (IntegrationPrefsStore.hasNotifiedRemoteCall(appContext, notifyKey)) continue
+      val isFromOtherPhone = call.receivingLine != phonesCfg.activeDeviceLine.id
+      if (isFromOtherPhone || call.isEscalated || call.status == "ESCALATED") {
+        IntegrationPrefsStore.markRemoteCallNotified(appContext, notifyKey)
+        val lineLabel = phonesCfg.displayLabelFor(call.receivingLine)
+        CallEscalationManager.triggerEscalationAlert(
+          context = appContext,
+          call = call,
+          urgencyReason = if (isFromOtherPhone) {
+            "Real call synced from $lineLabel"
+          } else {
+            call.escalationNotes.ifBlank { "Real escalated call on $lineLabel" }
+          },
+          targetEmail = escCfg.targetEmail
+        )
+        if (_activeCallAlert.value == null && (call.isEscalated || call.status == "ESCALATED" || isFromOtherPhone)) {
+          _activeCallAlert.value = call
+        }
+      }
     }
   }
 
@@ -280,7 +664,8 @@ class OceanSurferViewModel(
 
         val remote = SupabaseClient.fetchCalls(cfg).getOrNull()
         if (remote != null) {
-          repository.reconcileRemoteCalls(remote)
+          val result = repository.reconcileRemoteCallsDetailed(remote)
+          notifyForNewRemoteCalls(result.newlyArrivedCalls)
           _lastSupabaseFetchTime.value = "Auto-synced at ${timeFormat.format(java.util.Date())}"
         }
       }
@@ -312,202 +697,6 @@ class OceanSurferViewModel(
 
   fun showSnackbar(msg: String) {
     _snackbarMessage.value = msg
-  }
-
-  // --- Incoming Call Handling & Simulation ---
-
-  fun simulateIncomingCall(
-    callerName: String,
-    callerNumber: String,
-    initialQuery: String
-  ) {
-    _activeCall.value = ActiveCallUiState(
-      isInCall = false,
-      isRinging = true,
-      callerName = callerName,
-      callerNumber = callerNumber,
-      currentCustomerQuery = initialQuery,
-      currentAiResponse = "",
-      isAiThinking = false,
-      callDurationSeconds = 0
-    )
-    viewModelScope.launch {
-      val returningCtx = repository.findReturningCallerContext(callerNumber)
-      if (returningCtx.isVipOrReturning) {
-        val current = _activeCall.value
-        val displayName = if (current.callerName.isBlank() || current.callerName == "Cell Phone Caller") {
-          returningCtx.matchedName ?: current.callerName
-        } else {
-          current.callerName
-        }
-        _activeCall.value = current.copy(
-          callerName = displayName,
-          returningContextBadge = returningCtx.toBadgeText(),
-          returningContextPrompt = returningCtx.toPromptContext()
-        )
-      }
-    }
-  }
-
-  fun answerIncomingCall() {
-    val current = _activeCall.value
-    _activeCall.value = current.copy(
-      isInCall = true,
-      isRinging = false
-    )
-    startCallTimer()
-    startAudioWaveform()
-
-    // Immediately trigger AI receptionist greeting & answer to caller's inquiry
-    if (current.currentCustomerQuery.isNotBlank()) {
-      processQuestionInCall(current.currentCustomerQuery)
-    } else {
-      val greeting = if (current.returningContextBadge.isNotBlank()) {
-        "Aloha and welcome back ${current.callerName}! You've reached Ocean Tide Drop AI Surfer. How can I help your business ride the AI wave today?"
-      } else {
-        "Aloha! You've reached Ocean Tide Drop AI Surfer (otdaisurfer.surf). How can I help your business ride the AI wave today?"
-      }
-      _activeCall.value = _activeCall.value.copy(currentAiResponse = greeting)
-      voiceController.speakReply(greeting)
-    }
-  }
-
-  fun processQuestionInCall(questionText: String) {
-    val current = _activeCall.value
-    _activeCall.value = current.copy(
-      currentCustomerQuery = questionText,
-      isAiThinking = true
-    )
-
-    viewModelScope.launch {
-      val returningPrompt = current.returningContextPrompt.ifBlank {
-        repository.findReturningCallerContext(current.callerNumber).toPromptContext()
-      }
-      val result = SurferAiReceptionist.processCallerQuestion(
-        callerName = current.callerName.ifBlank { "Caller" },
-        callerNumber = current.callerNumber.ifBlank { "+1 (555) 789-WAVE" },
-        question = questionText,
-        products = products.value,
-        faqs = faqs.value,
-        openAiApiKey = _chatGptConfig.value.apiKey,
-        modelName = _chatGptConfig.value.model,
-        returningContext = returningPrompt,
-        useOpenAi = _chatGptConfig.value.isEnabled
-      )
-
-      val shouldEscalate = result.requiresImmediateEscalation ||
-        (_escalationTriggerConfig.value.escalateOnHighUrgency && result.urgency == "HIGH")
-      val reason = result.escalationReason.ifBlank {
-        if (shouldEscalate) "AI Receptionist flagged call for priority crew escalation." else ""
-      }
-
-      _activeCall.value = _activeCall.value.copy(
-        currentAiResponse = result.responseText,
-        isAiThinking = false,
-        isFlaggedForEscalation = shouldEscalate,
-        escalationReason = reason
-      )
-      voiceController.speakReply(result.responseText)
-    }
-  }
-
-  fun endCallAndSaveTranscript() {
-    val current = _activeCall.value
-    callTimerJob?.cancel()
-    waveAnimationJob?.cancel()
-    voiceController.stopListening()
-    voiceController.stopSpeaking()
-
-    if (current.currentCustomerQuery.isNotBlank() || current.currentAiResponse.isNotBlank()) {
-      viewModelScope.launch {
-        val returningPrompt = current.returningContextPrompt.ifBlank {
-          repository.findReturningCallerContext(current.callerNumber).toPromptContext()
-        }
-        val result = SurferAiReceptionist.processCallerQuestion(
-          callerName = current.callerName.ifBlank { "Ocean Caller" },
-          callerNumber = current.callerNumber.ifBlank { "+1 (555) 019-9283" },
-          question = current.currentCustomerQuery.ifBlank { "General surf inquiries" },
-          products = products.value,
-          faqs = faqs.value,
-          openAiApiKey = _chatGptConfig.value.apiKey,
-          modelName = _chatGptConfig.value.model,
-          returningContext = returningPrompt,
-          useOpenAi = _chatGptConfig.value.isEnabled
-        )
-
-        val cfg = _escalationTriggerConfig.value
-        val shouldEscalate = result.requiresImmediateEscalation ||
-          (cfg.escalateOnHighUrgency && result.urgency == "HIGH")
-        val alertMinutes = if (shouldEscalate) 3 else 10
-        val deadline = System.currentTimeMillis() + (alertMinutes * 60 * 1000)
-
-        val callEntity = CallEntity(
-          callerNumber = current.callerNumber.ifBlank { "+1 (555) 019-9283" },
-          callerName = current.callerName.ifBlank { "Ocean Caller" },
-          timestamp = System.currentTimeMillis(),
-          durationSeconds = current.callDurationSeconds,
-          status = "PENDING_REVIEW",
-          urgency = result.urgency,
-          topic = result.topic,
-          summary = result.summary,
-          transcription = "Caller: \"${current.currentCustomerQuery}\"\nAI Surfer: \"${result.responseText}\"",
-          customerQuestion = current.currentCustomerQuery,
-          aiResponse = result.responseText,
-          escalationAlertMinutes = alertMinutes,
-          escalationDeadline = deadline,
-          isEscalated = false,
-          supabaseSynced = false
-        )
-
-        val newId = repository.insertCall(callEntity)
-        var savedCall = callEntity.copy(id = newId)
-
-        if (_supabaseConfig.value.autoSyncCalls) {
-          val syncResult = SupabaseClient.syncCallRecord(_supabaseConfig.value, savedCall)
-          if (syncResult.isSuccess) {
-            repository.markSupabaseSynced(newId)
-            savedCall = savedCall.copy(supabaseSynced = true)
-          } else {
-            SupabaseCallSyncWorker.enqueueImmediateSync(appContext)
-          }
-        }
-
-        if (shouldEscalate && cfg.isEnabled) {
-          val reason = result.escalationReason.ifBlank {
-            "AI flagged incoming call (${result.urgency}) for immediate escalation."
-          }
-          dispatchAiEscalationAlert(savedCall, reason)
-        } else {
-          _snackbarMessage.value = "Call logged & summarized! Escalation timer set to $alertMinutes min."
-        }
-      }
-    }
-
-    _activeCall.value = ActiveCallUiState()
-  }
-
-  private fun startCallTimer() {
-    callTimerJob?.cancel()
-    callTimerJob = viewModelScope.launch {
-      while (true) {
-        delay(1000)
-        _activeCall.value = _activeCall.value.copy(
-          callDurationSeconds = _activeCall.value.callDurationSeconds + 1
-        )
-      }
-    }
-  }
-
-  private fun startAudioWaveform() {
-    waveAnimationJob?.cancel()
-    waveAnimationJob = viewModelScope.launch {
-      val random = java.util.Random()
-      while (true) {
-        delay(120)
-        val newWave = List(8) { 0.2f + random.nextFloat() * 0.8f }
-        _activeCall.value = _activeCall.value.copy(audioWaveHeights = newWave)
-      }
-    }
   }
 
   // --- Call Review & Escalation Actions ---
@@ -576,57 +765,6 @@ class OceanSurferViewModel(
       }
       dispatchAiEscalationAlert(call, reason, overrideChannel = EscalationAlertChannel.EMAIL)
     }
-  }
-
-  fun triggerAiEscalationForQuestion(
-    callerName: String,
-    callerNumber: String,
-    question: String
-  ) {
-    viewModelScope.launch {
-      val result = SurferAiReceptionist.processCallerQuestion(
-        callerName = callerName,
-        callerNumber = callerNumber,
-        question = question,
-        products = products.value,
-        faqs = faqs.value,
-        openAiApiKey = _chatGptConfig.value.apiKey,
-        modelName = _chatGptConfig.value.model,
-        useOpenAi = _chatGptConfig.value.isEnabled
-      )
-
-      val callEntity = CallEntity(
-        callerNumber = callerNumber,
-        callerName = callerName,
-        timestamp = System.currentTimeMillis(),
-        durationSeconds = 52,
-        status = "PENDING_REVIEW",
-        urgency = if (result.requiresImmediateEscalation) result.urgency else "URGENT_VIP",
-        topic = result.topic,
-        summary = result.summary,
-        transcription = "Caller: \"$question\"\nAI Surfer: \"${result.responseText}\"",
-        customerQuestion = question,
-        aiResponse = result.responseText,
-        escalationAlertMinutes = 3,
-        escalationDeadline = System.currentTimeMillis() + (3 * 60 * 1000),
-        isEscalated = false
-      )
-      val newId = repository.insertCall(callEntity)
-      val savedCall = callEntity.copy(id = newId)
-      val reason = result.escalationReason.ifBlank {
-        "AI Receptionist flagged incoming call for immediate escalation."
-      }
-      dispatchAiEscalationAlert(savedCall, reason)
-      _selectedStatusFilter.value = com.example.ui.components.CallStatusFilter.ESCALATED
-    }
-  }
-
-  fun triggerTestCallAlert() {
-    triggerAiEscalationForQuestion(
-      callerName = "Makena Kai (VIP Lead)",
-      callerNumber = "+1 (808) 555-SURF",
-      question = "Urgent! We need immediate assistance with Big Kahuna enterprise onboarding and Wave Starter checkout—please escalate to a manager ASAP!"
-    )
   }
 
   fun deleteCall(callId: Long) {
@@ -725,14 +863,15 @@ class OceanSurferViewModel(
         val syncedAt = timeFormat.format(java.util.Date())
         if (liveResult.isSuccess) {
           val remoteCalls = liveResult.getOrNull().orEmpty()
-          val reconciled = repository.reconcileRemoteCalls(remoteCalls)
+          val reconcile = repository.reconcileRemoteCallsDetailed(remoteCalls)
+          notifyForNewRemoteCalls(reconcile.newlyArrivedCalls)
           _supabaseConnectionState.value = SupabaseConnectionState.Connected(
             latencyMs = 0L,
-            message = "Synced ${remoteCalls.size} live rows ($reconciled updated, $pushedCount uploaded) from Supabase public.calls"
+            message = "Synced ${remoteCalls.size} live rows (${reconcile.updatedCount} updated, $pushedCount uploaded) from Supabase public.calls"
           )
           _lastSupabaseFetchTime.value = "Live Supabase sync at $syncedAt"
           _snackbarMessage.value = if (remoteCalls.isNotEmpty()) {
-            "Synced ${remoteCalls.size} call logs from Supabase!"
+            "Synced ${remoteCalls.size} real call logs from Supabase!"
           } else {
             "Synced with Supabase ($pushedCount uploaded, 0 remote rows)."
           }
@@ -768,6 +907,93 @@ class OceanSurferViewModel(
   fun resetGeminiAdvisor() {
     advisorJob?.cancel()
     _geminiAdvisorState.value = GeminiAdvisorUiState.Idle
+  }
+
+  // --- Full AI Instruments Studio Actions ---
+
+  fun selectAiInstrument(tool: AiInstrumentTool) {
+    _selectedAiInstrument.value = tool
+  }
+
+  fun sendCopilotMessage(rawMessage: String) {
+    val text = rawMessage.trim()
+    if (text.isBlank() || _isCopilotSending.value) return
+    _copilotMessages.value = _copilotMessages.value + CopilotChatMessage(isFromUser = true, text = text)
+    _isCopilotSending.value = true
+    _copilotError.value = null
+    viewModelScope.launch {
+      val result = AiInstrumentsEngine.sendCopilotMessage(appContext, text)
+      _isCopilotSending.value = false
+      if (result.isSuccess) {
+        val reply = result.getOrNull().orEmpty()
+        _copilotMessages.value = _copilotMessages.value + CopilotChatMessage(isFromUser = false, text = reply)
+      } else {
+        _copilotError.value = result.exceptionOrNull()?.localizedMessage ?: "Copilot request failed."
+      }
+    }
+  }
+
+  fun resetCopilotChat() {
+    AiInstrumentsEngine.resetCopilotChat()
+    _copilotError.value = null
+    _copilotMessages.value = listOf(
+      CopilotChatMessage(
+        isFromUser = false,
+        text = "Fresh session started! Ask Kai Copilot anything about your business AI strategy or call handling."
+      )
+    )
+  }
+
+  fun analyzePickedImage(bitmap: Bitmap, instruction: String) {
+    _visionResultState.value = InstrumentTextUiState.Loading
+    viewModelScope.launch {
+      _visionResultState.value = AiInstrumentsEngine.analyzeImage(appContext, bitmap, instruction)
+    }
+  }
+
+  fun generateAiImage(prompt: String, sourceBitmap: Bitmap? = null) {
+    _imageGenState.value = ImageGenUiState.Loading
+    viewModelScope.launch {
+      _imageGenState.value = AiInstrumentsEngine.generateOrEditImage(appContext, prompt, sourceBitmap)
+    }
+  }
+
+  fun clearAiImage() {
+    _imageGenState.value = ImageGenUiState.Idle
+  }
+
+  fun generateSalesPitch(prospect: String, bottleneck: String) {
+    val cleanProspect = prospect.trim()
+    if (cleanProspect.isBlank()) {
+      _pitchBriefState.value = PitchBriefUiState.Error("Enter a client business or industry first.")
+      return
+    }
+    _pitchBriefState.value = PitchBriefUiState.Loading
+    viewModelScope.launch {
+      _pitchBriefState.value = AiInstrumentsEngine.generateSalesPitchBrief(
+        context = appContext,
+        prospectBusiness = cleanProspect,
+        painPoint = bottleneck,
+        products = products.value
+      )
+    }
+  }
+
+  fun analyzeRealCallQueue() {
+    _callQueueBriefState.value = CallQueueBriefUiState.Loading
+    viewModelScope.launch {
+      _callQueueBriefState.value = AiInstrumentsEngine.analyzeCallQueue(
+        context = appContext,
+        calls = calls.value
+      )
+    }
+  }
+
+  fun runTranslatorOrRewriter(text: String, targetMode: String) {
+    _translatorState.value = InstrumentTextUiState.Loading
+    viewModelScope.launch {
+      _translatorState.value = AiInstrumentsEngine.translateOrRewrite(appContext, text, targetMode)
+    }
   }
 
   fun submitClientWaveCheck(
@@ -812,7 +1038,9 @@ class OceanSurferViewModel(
         )
       )
 
-      // Log into Call Dashboard & Room so staff immediately sees the client intake
+      // Log into Call Dashboard & Room so both business phones see the client intake
+      val activeLineId = _businessPhonesConfig.value.activeDeviceLine.id
+      val activeLineDisplay = _businessPhonesConfig.value.activeLineDisplay()
       val leadCall = CallEntity(
         callerNumber = dto.contactPhone,
         callerName = "${dto.contactName} (${dto.businessName})",
@@ -822,13 +1050,14 @@ class OceanSurferViewModel(
         urgency = if (recommended.contains("3,997")) "URGENT_VIP" else "HIGH",
         topic = "LEAD_WAVE_CHECK",
         summary = "Topic: Client Wave Check Intake | Action Items: Review $recommended fit & email ${dto.contactEmail} | Sentiment: Positive (Qualified Lead)",
-        transcription = "Client Portal Wave Check submission for ${dto.businessName}. Bottleneck: $biggestBottleneck",
+        transcription = "Client Portal Wave Check ($activeLineDisplay) for ${dto.businessName}. Bottleneck: $biggestBottleneck\n[Line: $activeLineId]",
         customerQuestion = "Free AI Wave Check™ Bottleneck: $biggestBottleneck",
         aiResponse = "Recommended Path: $recommended. Strategy link: https://otdaisurfer.surf/wave-check",
         escalationAlertMinutes = 10,
         escalationDeadline = System.currentTimeMillis() + 10 * 60_000L,
         isEscalated = false,
-        supabaseSynced = false
+        supabaseSynced = false,
+        receivingLine = activeLineId
       )
       val id = repository.insertCall(leadCall)
       if (_supabaseConfig.value.autoSyncCalls) {
@@ -870,6 +1099,13 @@ class OceanSurferViewModel(
       lastDeploymentStatus = "Connected: ${owner.trim()}/${repo.trim()} (Live on otdaisurfer.surf)"
     )
     _snackbarMessage.value = "Updated connected repo to ${owner.trim()}/${repo.trim()}"
+  }
+
+  fun syncProductsFromWebsite() {
+    viewModelScope.launch {
+      repository.forceSyncOfficialProducts()
+      _snackbarMessage.value = "Synced official Ocean Tide Drop AI Surfer catalog from otdaisurfer.surf!"
+    }
   }
 
   fun addNewProduct(

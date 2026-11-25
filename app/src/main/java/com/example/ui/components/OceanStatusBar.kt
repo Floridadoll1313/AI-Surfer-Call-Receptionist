@@ -67,10 +67,12 @@ fun OceanStatusBar(
   pendingCount: Int = 0,
   escalatedCount: Int = 0,
   reviewedCount: Int = 0,
+  activeDeviceLineLabel: String = "Phone 1",
   triggerChannelLabel: String = "NOTIFY + EMAIL",
   targetEmail: String = "oceantidedropservice@gmail.com",
+  signedInGoogleEmail: String? = null,
   onOpenAlerts: () -> Unit = {},
-  onTriggerTestAlert: () -> Unit = {},
+  onOpenPhoneSetup: () -> Unit = {},
   modifier: Modifier = Modifier
 ) {
   var isExpanded by remember { mutableStateOf(false) }
@@ -133,7 +135,7 @@ fun OceanStatusBar(
         Spacer(modifier = Modifier.width(6.dp))
 
         Text(
-          text = if (isOnline) "24/7 AI RECEPTIONIST" else "STANDBY",
+          text = if (isOnline) "AI SURFER LIVE" else "STANDBY",
           color = if (isOnline) colors.seaGreen else colors.textSecondary,
           fontSize = 11.sp,
           fontWeight = FontWeight.ExtraBold,
@@ -159,7 +161,7 @@ fun OceanStatusBar(
             )
             Spacer(modifier = Modifier.width(3.dp))
             Text(
-              text = "CELL GUARD",
+              text = activeDeviceLineLabel.uppercase(),
               color = colors.cyan,
               fontSize = 9.sp,
               fontWeight = FontWeight.Bold
@@ -218,7 +220,7 @@ fun OceanStatusBar(
             )
             Spacer(modifier = Modifier.width(4.dp))
             Text(
-              text = if (pendingCount > 0) "$pendingCount In Queue" else "Queue Clear",
+              text = if (pendingCount > 0) "$pendingCount Pending" else "2-Phone Guard Ready",
               color = if (pendingCount > 0) colors.sunsetOrange else colors.seaGreen,
               fontSize = 10.sp,
               fontWeight = FontWeight.Bold
@@ -285,7 +287,7 @@ fun OceanStatusBar(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Crew Dispatch destination & Test Alert trigger
+        // Real alert destination & 2-phone setup shortcut
         Row(
           modifier = Modifier.fillMaxWidth(),
           verticalAlignment = Alignment.CenterVertically
@@ -297,30 +299,44 @@ fun OceanStatusBar(
             modifier = Modifier.size(13.dp)
           )
           Spacer(modifier = Modifier.width(6.dp))
-          Text(
-            text = "Trigger ($triggerChannelLabel) -> $targetEmail",
-            color = colors.textSecondary,
-            fontSize = 10.sp,
-            modifier = Modifier.weight(1f)
-          )
+          Column(modifier = Modifier.weight(1f)) {
+            Text(
+              text = "Real Alerts ($triggerChannelLabel) -> $targetEmail",
+              color = colors.textSecondary,
+              fontSize = 10.sp
+            )
+            Text(
+              text = if (!signedInGoogleEmail.isNullOrBlank()) {
+                "Google Account: $signedInGoogleEmail"
+              } else {
+                "Google Account: Not signed in (tap 2-Phone Setup)"
+              },
+              color = if (!signedInGoogleEmail.isNullOrBlank()) colors.seaGreen else colors.cyan,
+              fontSize = 10.sp,
+              fontWeight = FontWeight.SemiBold
+            )
+          }
 
           Spacer(modifier = Modifier.width(6.dp))
 
           Button(
-            onClick = onTriggerTestAlert,
-            colors = ButtonDefaults.buttonColors(containerColor = colors.coralAlert),
+            onClick = {
+              isExpanded = false
+              onOpenPhoneSetup()
+            },
+            colors = ButtonDefaults.buttonColors(containerColor = colors.teal),
             shape = RoundedCornerShape(8.dp),
             modifier = Modifier
               .height(30.dp)
-              .testTag("trigger_test_alert_button")
+              .testTag("status_bar_phone_setup_button")
           ) {
             Icon(
-              imageVector = Icons.Default.Campaign,
+              imageVector = Icons.Default.CellTower,
               contentDescription = null,
               modifier = Modifier.size(12.dp)
             )
             Spacer(modifier = Modifier.width(4.dp))
-            Text("Test Alert", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            Text("2-Phone Setup", fontSize = 10.sp, fontWeight = FontWeight.Bold)
           }
         }
       }

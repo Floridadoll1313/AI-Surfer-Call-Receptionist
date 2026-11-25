@@ -44,10 +44,20 @@ class AppRepository(private val database: AppDatabase) {
     callDao.markSupabaseSynced(callId)
   }
 
+  data class RemoteSyncReconcileResult(
+    val updatedCount: Int,
+    val newlyArrivedCalls: List<CallEntity>
+  )
+
   suspend fun reconcileRemoteCalls(remoteCalls: List<CallEntity>): Int {
-    if (remoteCalls.isEmpty()) return 0
+    return reconcileRemoteCallsDetailed(remoteCalls).updatedCount
+  }
+
+  suspend fun reconcileRemoteCallsDetailed(remoteCalls: List<CallEntity>): RemoteSyncReconcileResult {
+    if (remoteCalls.isEmpty()) return RemoteSyncReconcileResult(0, emptyList())
     val localCalls = callDao.getAllCallsSnapshot()
     var updated = 0
+    val newlyArrived = mutableListOf<CallEntity>()
     for (remote in remoteCalls) {
       val match = localCalls.firstOrNull { local ->
         local.id == remote.id ||
@@ -55,23 +65,25 @@ class AppRepository(private val database: AppDatabase) {
             kotlin.math.abs(local.timestamp - remote.timestamp) < 5_000L)
       }
       if (match != null) {
-        if (match.status != remote.status || !match.supabaseSynced || match.isEscalated != remote.isEscalated) {
+        if (match.status != remote.status || !match.supabaseSynced || match.isEscalated != remote.isEscalated || match.receivingLine != remote.receivingLine) {
           callDao.updateCall(
             match.copy(
               status = remote.status,
               isEscalated = remote.isEscalated,
               escalationNotes = remote.escalationNotes.ifBlank { match.escalationNotes },
+              receivingLine = remote.receivingLine.ifBlank { match.receivingLine },
               supabaseSynced = true
             )
           )
           updated++
         }
       } else {
-        callDao.insertCall(remote.copy(supabaseSynced = true))
+        val insertedId = callDao.insertCall(remote.copy(supabaseSynced = true))
+        newlyArrived.add(remote.copy(id = insertedId, supabaseSynced = true))
         updated++
       }
     }
-    return updated
+    return RemoteSyncReconcileResult(updated, newlyArrived)
   }
 
   suspend fun insertLead(lead: WaveAuditLeadEntity) {

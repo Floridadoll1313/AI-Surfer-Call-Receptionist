@@ -5,6 +5,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
+import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -52,14 +54,15 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ai.configureAppCheck
+import com.example.auth.GoogleSignInManager
 import com.example.data.AppRepository
 import com.example.telephony.CallEscalationManager
 import com.example.ui.OceanSurferViewModel
 import com.example.ui.OceanSurferViewModelFactory
-import com.example.ui.components.ActiveCallOverlay
 import com.example.ui.components.CallAlertBanner
 import com.example.ui.components.CallStatusFilter
 import com.example.ui.components.OceanStatusBar
+import com.example.ui.input.DuplicateKeyEventFilter
 import com.example.ui.screens.CallsScreen
 import com.example.ui.screens.ClientHubScreen
 import com.example.ui.screens.IntegrationsScreen
@@ -71,6 +74,7 @@ import com.example.ui.theme.ThemeProvider
 class MainActivity : ComponentActivity() {
 
   private val notificationTabState = mutableStateOf<Int?>(null)
+  private val keyEventFilter = DuplicateKeyEventFilter()
 
   private val viewModel: OceanSurferViewModel by viewModels {
     val app = application as OceanSurferApp
@@ -101,6 +105,13 @@ class MainActivity : ComponentActivity() {
     }
   }
 
+  override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+    if (keyEventFilter.shouldSuppressDuplicateKeyEvent(event, SystemClock.uptimeMillis())) {
+      return true
+    }
+    return super.dispatchKeyEvent(event)
+  }
+
   override fun onNewIntent(intent: Intent) {
     super.onNewIntent(intent)
     setIntent(intent)
@@ -125,12 +136,12 @@ fun OceanSurferMainContent(
       onConsumedRequestedTab()
     }
   }
-  val activeCall by viewModel.activeCall.collectAsStateWithLifecycle()
-  val voiceUiState by viewModel.voiceUiState.collectAsStateWithLifecycle()
   val allCalls by viewModel.calls.collectAsStateWithLifecycle()
   val pendingCalls by viewModel.pendingCalls.collectAsStateWithLifecycle()
   val activeCallAlert by viewModel.activeCallAlert.collectAsStateWithLifecycle()
   val escalationTriggerConfig by viewModel.escalationTriggerConfig.collectAsStateWithLifecycle()
+  val businessPhonesConfig by viewModel.businessPhonesConfig.collectAsStateWithLifecycle()
+  val googleAccountState by viewModel.googleAccountState.collectAsStateWithLifecycle()
   val pendingEmailEscalation by viewModel.pendingEmailEscalation.collectAsStateWithLifecycle()
   val snackbarMessage by viewModel.snackbarMessage.collectAsStateWithLifecycle()
   val snackbarHostState = remember { SnackbarHostState() }
@@ -145,6 +156,13 @@ fun OceanSurferMainContent(
   ) { _ -> }
 
   LaunchedEffect(Unit) {
+    GoogleSignInManager.attemptAutoSignIn(
+      context = context,
+      onAuthSuccess = { user -> viewModel.onGoogleAuthSuccess(user, showSnackbar = false) },
+      onUnauthenticated = { },
+      scope = this
+    )
+
     val permissionsToRequest = mutableListOf<String>()
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
       if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
@@ -194,15 +212,16 @@ fun OceanSurferMainContent(
           pendingCount = pendingCalls.size,
           escalatedCount = escalatedCount,
           reviewedCount = reviewedCount,
+          activeDeviceLineLabel = businessPhonesConfig.activeDeviceLine.shortLabel,
           triggerChannelLabel = if (escalationTriggerConfig.isEnabled) escalationTriggerConfig.alertChannel.shortTag else "PAUSED",
           targetEmail = escalationTriggerConfig.targetEmail,
+          signedInGoogleEmail = googleAccountState.email.takeIf { googleAccountState.isSignedIn },
           onOpenAlerts = {
             selectedTab = 1
             viewModel.setStatusFilter(CallStatusFilter.ESCALATED)
           },
-          onTriggerTestAlert = {
-            viewModel.triggerTestCallAlert()
-            selectedTab = 1
+          onOpenPhoneSetup = {
+            selectedTab = 4
           }
         )
       },
@@ -328,7 +347,9 @@ fun OceanSurferMainContent(
           when (selectedTab) {
             0 -> ReceptionistScreen(
               viewModel = viewModel,
-              onNavigateToCalls = { selectedTab = 1 }
+              onNavigateToCalls = { selectedTab = 1 },
+              onOpenPhoneSetup = { selectedTab = 4 },
+              onOpenAiStudio = { selectedTab = 2 }
             )
             1 -> CallsScreen(viewModel = viewModel)
             2 -> ClientHubScreen(viewModel = viewModel)
@@ -338,17 +359,5 @@ fun OceanSurferMainContent(
         }
       }
     }
-
-    // Active Call Simulation & Live Voice Overlay
-    ActiveCallOverlay(
-      activeCall = activeCall,
-      onAnswer = { viewModel.answerIncomingCall() },
-      onEndCall = { viewModel.endCallAndSaveTranscript() },
-      onSendQuery = { query -> viewModel.processQuestionInCall(query) },
-      voiceUiState = voiceUiState,
-      onStartVoiceListening = { viewModel.startVoiceListening() },
-      onStopVoiceListening = { viewModel.stopVoiceListening() },
-      onToggleVoiceOutput = { viewModel.toggleVoiceOutput() }
-    )
   }
 }
