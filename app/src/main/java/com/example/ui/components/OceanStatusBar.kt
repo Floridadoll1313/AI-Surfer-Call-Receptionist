@@ -25,6 +25,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -55,6 +58,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -75,6 +80,8 @@ fun OceanStatusBar(
 ) {
   var isExpanded by remember { mutableStateOf(false) }
   val colors = OceanTheme.colors
+
+  val trayHeightLimit = LocalConfiguration.current.screenHeightDp.dp / 5
 
   // Pulsing animation for the green live indicator & alert indicator
   val infiniteTransition = rememberInfiniteTransition(label = "status_pulse")
@@ -120,6 +127,7 @@ fun OceanStatusBar(
       Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
+          .weight(1f)
           .clickable { isExpanded = !isExpanded }
           .padding(vertical = 4.dp)
       ) {
@@ -137,6 +145,9 @@ fun OceanStatusBar(
           color = if (isOnline) colors.seaGreen else colors.textSecondary,
           fontSize = 11.sp,
           fontWeight = FontWeight.ExtraBold,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+          modifier = Modifier.weight(1f, fill = false),
           letterSpacing = 0.5.sp
         )
 
@@ -160,6 +171,8 @@ fun OceanStatusBar(
             Spacer(modifier = Modifier.width(3.dp))
             Text(
               text = "CELL GUARD",
+              maxLines = 1,
+              overflow = TextOverflow.Ellipsis,
               color = colors.cyan,
               fontSize = 9.sp,
               fontWeight = FontWeight.Bold
@@ -168,7 +181,6 @@ fun OceanStatusBar(
         }
       }
 
-      Spacer(modifier = Modifier.weight(1f))
 
       // Call Alerts Status Pill
       if (escalatedCount > 0) {
@@ -193,6 +205,8 @@ fun OceanStatusBar(
             Spacer(modifier = Modifier.width(4.dp))
             Text(
               text = "⚠️ $escalatedCount CALL ALERT${if (escalatedCount > 1) "S" else ""}",
+              maxLines = 1,
+              overflow = TextOverflow.Ellipsis,
               color = Color.White,
               fontSize = 10.sp,
               fontWeight = FontWeight.ExtraBold
@@ -219,6 +233,8 @@ fun OceanStatusBar(
             Spacer(modifier = Modifier.width(4.dp))
             Text(
               text = if (pendingCount > 0) "$pendingCount In Queue" else "Queue Clear",
+              maxLines = 1,
+              overflow = TextOverflow.Ellipsis,
               color = if (pendingCount > 0) colors.sunsetOrange else colors.seaGreen,
               fontSize = 10.sp,
               fontWeight = FontWeight.Bold
@@ -236,7 +252,7 @@ fun OceanStatusBar(
       ) {
         Icon(
           imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-          contentDescription = "Expand Status Details",
+          contentDescription = if (isExpanded) "Collapse Status Details" else "Expand Status Details",
           tint = colors.textSecondary,
           modifier = Modifier.size(16.dp)
         )
@@ -252,6 +268,8 @@ fun OceanStatusBar(
       Column(
         modifier = Modifier
           .fillMaxWidth()
+          .heightIn(max = trayHeightLimit)
+          .verticalScroll(rememberScrollState())
           .background(colors.deepBlue)
           .padding(horizontal = 14.dp, vertical = 8.dp)
       ) {
