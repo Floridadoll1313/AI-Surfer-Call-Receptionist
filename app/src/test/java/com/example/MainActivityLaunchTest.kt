@@ -9,6 +9,7 @@ import com.example.data.local.CallEntity
 import org.robolectric.RuntimeEnvironment
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -109,8 +110,12 @@ class MainActivityLaunchTest {
     }
 
     composeTestRule.onNodeWithTag("nav_products").performClick()
+    composeTestRule.waitUntil(timeoutMillis = 5000) {
+      composeTestRule.onAllNodesWithTag("status_bar_alert_pill").fetchSemanticsNodes().isNotEmpty()
+    }
+    composeTestRule.onNodeWithTag("status_bar_alert_pill").assertIsDisplayed()
     composeTestRule.onNodeWithContentDescription("Expand Status Details").performClick()
-    composeTestRule.onNodeWithText("44 Alerts").assertIsDisplayed()
+    composeTestRule.onNodeWithText("44 Alerts").performScrollTo().assertIsDisplayed()
     composeTestRule.onNode(hasScrollToIndexAction()).performScrollToIndex(1)
     composeTestRule.onNodeWithTag("product_item_1").assertIsDisplayed()
 
