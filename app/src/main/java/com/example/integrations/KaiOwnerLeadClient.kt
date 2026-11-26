@@ -11,8 +11,8 @@ import org.json.JSONObject
 import java.io.IOException
 
 object KaiOwnerLeadClient {
-  private const val project = "https://mkgnyarwiscttobnytin.supabase.co"
-  private const val publicKey = "sb_publishable_Jp0Laxs-KoieNMD5hqLA0w_jCnrxATm"
+  const val project = "https://mkgnyarwiscttobnytin.supabase.co"
+  const val publicKey = "sb_publishable_Jp0Laxs-KoieNMD5hqLA0w_jCnrxATm"
   private val client = OkHttpClient.Builder().followRedirects(false).build()
   private val json = "application/json".toMediaType()
 
@@ -24,6 +24,11 @@ object KaiOwnerLeadClient {
       if (!response.isSuccessful) throw IOException("HTTP " + response.code)
       response.body?.string().orEmpty()
     }
+  }
+
+  suspend fun signInForCalls(email: String, password: String) = withContext(Dispatchers.IO) {
+    val credentials = JSONObject().put("email", email.trim()).put("password", password)
+    OwnerCallSession.save(JSONObject(post("/auth/v1/token?grant_type=password", credentials)))
   }
 
   suspend fun submit(lead: WaveAuditLeadEntity, ownerEmail: String, password: String) = withContext(Dispatchers.IO) {

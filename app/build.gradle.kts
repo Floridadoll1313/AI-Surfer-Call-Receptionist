@@ -43,7 +43,10 @@ android {
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
     }
     debug {
-      if (providers.gradleProperty("kaiOwnerTest").orNull == "true") {
+      if (providers.gradleProperty("kaiCallTest").orNull == "true") {
+        applicationIdSuffix = ".calltest"
+        manifestPlaceholders["kaiAppLabel"] = "Kai Call Sync Test"
+      } else if (providers.gradleProperty("kaiOwnerTest").orNull == "true") {
         applicationIdSuffix = ".ownertest"
         manifestPlaceholders["kaiAppLabel"] = "Kai Owner Test"
       }

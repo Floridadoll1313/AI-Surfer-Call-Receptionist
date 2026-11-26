@@ -77,11 +77,11 @@ interface SupabaseRestApi {
     @Header("Authorization") bearer: String?
   ): Response<List<SupabaseCallRecordDto>>
 
-  @POST("rest/v1/calls")
+  @POST("rest/v1/calls?on_conflict=caller_number,call_timestamp")
   suspend fun insertCall(
     @Header("apikey") apiKey: String,
     @Header("Authorization") bearer: String?,
-    @Header("Prefer") prefer: String = "return=representation",
+    @Header("Prefer") prefer: String = "resolution=ignore-duplicates,return=representation",
     @Body body: SupabaseCallRecordDto
   ): Response<List<SupabaseCallRecordDto>>
 
@@ -90,7 +90,8 @@ interface SupabaseRestApi {
     @Header("apikey") apiKey: String,
     @Header("Authorization") bearer: String?,
     @Header("Prefer") prefer: String = "return=representation",
-    @Query("id") idEq: String,
+    @Query("caller_number") numberEq: String,
+    @Query("call_timestamp") timeEq: String,
     @Body body: SupabaseCallPatchDto
   ): Response<List<SupabaseCallRecordDto>>
 
@@ -106,13 +107,9 @@ interface SupabaseRestApi {
 object SupabaseClient {
 
   private val okHttpClient: OkHttpClient by lazy {
-    val logging = HttpLoggingInterceptor().apply {
-      level = HttpLoggingInterceptor.Level.BASIC
-      redactHeader("apikey")
-      redactHeader("Authorization")
-    }
     OkHttpClient.Builder()
-      .addInterceptor(logging)
+      .followRedirects(false)
+      .followSslRedirects(false)
       .connectTimeout(12, TimeUnit.SECONDS)
       .readTimeout(15, TimeUnit.SECONDS)
       .build()
@@ -163,7 +160,7 @@ object SupabaseClient {
       val key = config.anonKey.trim()
       val response = api.pingCallsTable(
         apiKey = key,
-        bearer = resolveBearerHeader(key)
+        bearer = OwnerCallSession.bearer(config.projectUrl)
       )
       val elapsed = System.currentTimeMillis() - start
       if (response.isSuccessful) {
@@ -194,7 +191,7 @@ object SupabaseClient {
       val key = config.anonKey.trim()
       val response = api.fetchCalls(
         apiKey = key,
-        bearer = resolveBearerHeader(key)
+        bearer = OwnerCallSession.bearer(config.projectUrl)
       )
       if (!response.isSuccessful) {
         return Result.failure(IllegalStateException("HTTP ${response.code()} from Supabase PostgREST"))
@@ -255,11 +252,18 @@ object SupabaseClient {
       )
       val resp = api.insertCall(
         apiKey = key,
-        bearer = resolveBearerHeader(key),
+        bearer = OwnerCallSession.bearer(config.projectUrl),
         body = dto
       )
-      if (resp.isSuccessful) Result.success(Unit)
-      else Result.failure(IllegalStateException("HTTP ${resp.code()} syncing call"))
+      if (!resp.isSuccessful) throw java.io.IOException("HTTP ${resp.code()} syncing call")
+      if (resp.body().isNullOrEmpty()) {
+        val patch = api.patchCallStatus(key, OwnerCallSession.bearer(config.projectUrl),
+          numberEq = "eq." + org.json.JSONObject.quote(call.callerNumber),
+          timeEq = "eq." + dto.callTimestamp,
+          body = SupabaseCallPatchDto(call.status, call.isEscalated))
+        if (!patch.isSuccessful || patch.body().isNullOrEmpty()) throw java.io.IOException("Call status update failed (HTTP ${patch.code()})")
+      }
+      Result.success(Unit)
     } catch (e: Exception) {
       Result.failure(e)
     }
@@ -290,19 +294,9 @@ object SupabaseClient {
   }
 
   private fun formatIsoTimestamp(millis: Long): String {
-    val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
-    sdf.timeZone = TimeZone.getTimeZone("UTC")
-    return sdf.format(Date(millis))
+    return java.time.Instant.ofEpochMilli(millis).toString()
   }
 
-  private fun parseIsoTimestamp(raw: String?): Long? {
-    if (raw.isNullOrBlank()) return null
-    return try {
-      val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
-      sdf.timeZone = TimeZone.getTimeZone("UTC")
-      sdf.parse(raw.take(19))?.time
-    } catch (_: Exception) {
-      null
-    }
-  }
+  private fun parseIsoTimestamp(raw: String?): Long? =
+    runCatching { java.time.OffsetDateTime.parse(raw).toInstant().toEpochMilli() }.getOrNull()
 }

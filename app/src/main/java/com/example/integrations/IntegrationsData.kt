@@ -21,7 +21,7 @@ data class SupabaseConfig(
 ) {
   companion object {
     const val PLACEHOLDER_PUBLISHABLE_KEY = "VITE_SUPABASE_PUBLISHABLE_KEY_DEFAULT_VALUE"
-    const val DEFAULT_PROJECT_URL = "https://pdbpmnnjhzrfezfmvami.supabase.co"
+    const val DEFAULT_PROJECT_URL = "https://mkgnyarwiscttobnytin.supabase.co"
 
     fun defaultProjectUrl(): String {
       return BuildConfig.VITE_SUPABASE_URL.trim().ifBlank { DEFAULT_PROJECT_URL }
@@ -262,8 +262,7 @@ object IntegrationPrefsStore {
     val storedKey = prefs.getString(KEY_SUPABASE_KEY, null)?.trim()
     val resolvedUrl = if (
       storedUrl.isNullOrBlank() ||
-      storedUrl.contains("kbgujyuxdopx.supabase.co") ||
-      storedUrl.contains("mkgnyarwiscttobnytin.supabase.co")
+      storedUrl.trimEnd('/') == "https://kbgujyuxdopx.supabase.co"
     ) {
       defaults.projectUrl
     } else {

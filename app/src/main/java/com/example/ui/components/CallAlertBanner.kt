@@ -12,6 +12,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -20,6 +21,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -80,170 +84,177 @@ fun CallAlertBanner(
           .padding(horizontal = 14.dp, vertical = 6.dp)
           .testTag("call_alert_banner")
       ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-          // Alert Header
-          Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
+        BoxWithConstraints {
+          Column(
+            modifier = Modifier
+              .heightIn(max = maxHeight / 3)
+              .verticalScroll(rememberScrollState())
+              .padding(14.dp)
           ) {
-            Surface(
-              shape = CircleShape,
-              color = colors.coralAlert.copy(alpha = 0.2f),
-              modifier = Modifier.size(36.dp)
+            // Alert Header
+            Row(
+              modifier = Modifier.fillMaxWidth(),
+              verticalAlignment = Alignment.CenterVertically
             ) {
-              Box(contentAlignment = Alignment.Center) {
-                Icon(
-                  imageVector = Icons.Default.Warning,
-                  contentDescription = "Alert",
-                  tint = colors.coralAlert,
-                  modifier = Modifier.size(20.dp)
-                )
-              }
-            }
-
-            Spacer(modifier = Modifier.width(10.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-              Text(
-                text = "⚠️ AI ESCALATION CALL ALERT",
-                color = colors.coralAlert,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.ExtraBold,
-                letterSpacing = 0.5.sp
-              )
-              Text(
-                text = "Flagged for immediate crew review • Target: $targetAlertEmail",
-                color = colors.textSecondary,
-                fontSize = 10.sp
-              )
-            }
-
-            IconButton(
-              onClick = onDismiss,
-              modifier = Modifier.size(28.dp)
-            ) {
-              Icon(
-                imageVector = Icons.Default.Close,
-                contentDescription = "Dismiss Alert",
-                tint = colors.textSecondary,
-                modifier = Modifier.size(18.dp)
-              )
-            }
-          }
-
-          Spacer(modifier = Modifier.height(10.dp))
-
-          // Caller Details & Snippet
-          Surface(
-            shape = RoundedCornerShape(10.dp),
-            color = colors.abyss,
-            border = BorderStroke(1.dp, colors.coralAlert.copy(alpha = 0.4f)),
-            modifier = Modifier.fillMaxWidth()
-          ) {
-            Column(modifier = Modifier.padding(10.dp)) {
-              Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+              Surface(
+                shape = CircleShape,
+                color = colors.coralAlert.copy(alpha = 0.2f),
+                modifier = Modifier.size(36.dp)
               ) {
-                Text(
-                  text = callAlert.callerName,
-                  color = colors.textPrimary,
-                  fontWeight = FontWeight.Bold,
-                  fontSize = 14.sp
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                  text = "(${callAlert.callerNumber})",
-                  color = colors.textSecondary,
-                  fontSize = 12.sp
-                )
-                Spacer(modifier = Modifier.weight(1f))
-                Surface(
-                  shape = RoundedCornerShape(6.dp),
-                  color = colors.coralAlert
-                ) {
-                  Text(
-                    text = callAlert.urgency,
-                    color = Color.White,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                Box(contentAlignment = Alignment.Center) {
+                  Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = "Alert",
+                    tint = colors.coralAlert,
+                    modifier = Modifier.size(20.dp)
                   )
                 }
               }
 
-              Spacer(modifier = Modifier.height(4.dp))
+              Spacer(modifier = Modifier.width(10.dp))
 
-              Text(
-                text = "\"${callAlert.customerQuestion}\"",
-                color = colors.textPrimary,
-                fontSize = 11.sp,
-                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
-              )
-
-              if (callAlert.escalationNotes.isNotBlank()) {
-                Spacer(modifier = Modifier.height(4.dp))
+              Column(modifier = Modifier.weight(1f)) {
                 Text(
-                  text = "Note: ${callAlert.escalationNotes}",
-                  color = colors.goldenSun,
+                  text = "⚠️ AI ESCALATION CALL ALERT",
+                  color = colors.coralAlert,
+                  fontSize = 12.sp,
+                  fontWeight = FontWeight.ExtraBold,
+                  letterSpacing = 0.5.sp
+                )
+                Text(
+                  text = "Flagged for immediate crew review • Target: $targetAlertEmail",
+                  color = colors.textSecondary,
                   fontSize = 10.sp
                 )
               }
-            }
-          }
 
-          Spacer(modifier = Modifier.height(10.dp))
-
-          // Quick Action Buttons
-          Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-          ) {
-            // Call Back
-            Button(
-              onClick = {
-                val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${callAlert.callerNumber}"))
-                try { context.startActivity(intent) } catch (e: Exception) {}
-              },
-              colors = ButtonDefaults.buttonColors(containerColor = colors.teal),
-              shape = RoundedCornerShape(8.dp),
-              modifier = Modifier.weight(1f)
-            ) {
-              Icon(imageVector = Icons.Default.Call, contentDescription = null, modifier = Modifier.size(14.dp))
-              Spacer(modifier = Modifier.width(4.dp))
-              Text("Call Back", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+              IconButton(
+                onClick = onDismiss,
+                modifier = Modifier.size(28.dp)
+              ) {
+                Icon(
+                  imageVector = Icons.Default.Close,
+                  contentDescription = "Dismiss Alert",
+                  tint = colors.textSecondary,
+                  modifier = Modifier.size(18.dp)
+                )
+              }
             }
 
-            // Email Crew
-            Button(
-              onClick = {
-                val intent = CallEscalationManager.createEmailEscalationIntent(callAlert, targetAlertEmail)
-                try {
-                  context.startActivity(Intent.createChooser(intent, "Send Escalation Email"))
-                } catch (_: Exception) {}
-              },
-              colors = ButtonDefaults.buttonColors(containerColor = colors.coralAlert),
-              shape = RoundedCornerShape(8.dp),
-              modifier = Modifier.weight(1f)
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Caller Details & Snippet
+            Surface(
+              shape = RoundedCornerShape(10.dp),
+              color = colors.abyss,
+              border = BorderStroke(1.dp, colors.coralAlert.copy(alpha = 0.4f)),
+              modifier = Modifier.fillMaxWidth()
             ) {
-              Icon(imageVector = Icons.Default.Email, contentDescription = null, modifier = Modifier.size(14.dp))
-              Spacer(modifier = Modifier.width(4.dp))
-              Text("Email Alert", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+              Column(modifier = Modifier.padding(10.dp)) {
+                Row(
+                  modifier = Modifier.fillMaxWidth(),
+                  verticalAlignment = Alignment.CenterVertically
+                ) {
+                  Text(
+                    text = callAlert.callerName,
+                    color = colors.textPrimary,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp
+                  )
+                  Spacer(modifier = Modifier.width(6.dp))
+                  Text(
+                    text = "(${callAlert.callerNumber})",
+                    color = colors.textSecondary,
+                    fontSize = 12.sp
+                  )
+                  Spacer(modifier = Modifier.weight(1f))
+                  Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = colors.coralAlert
+                  ) {
+                    Text(
+                      text = callAlert.urgency,
+                      color = Color.White,
+                      fontSize = 9.sp,
+                      fontWeight = FontWeight.Bold,
+                      modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                  }
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Text(
+                  text = "\"${callAlert.customerQuestion}\"",
+                  color = colors.textPrimary,
+                  fontSize = 11.sp,
+                  fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                )
+
+                if (callAlert.escalationNotes.isNotBlank()) {
+                  Spacer(modifier = Modifier.height(4.dp))
+                  Text(
+                    text = "Note: ${callAlert.escalationNotes}",
+                    color = colors.goldenSun,
+                    fontSize = 10.sp
+                  )
+                }
+              }
             }
 
-            // Mark Reviewed & Clear Alert
-            Button(
-              onClick = {
-                onMarkReviewed(callAlert.id)
-                onDismiss()
-              },
-              colors = ButtonDefaults.buttonColors(containerColor = colors.seaGreen),
-              shape = RoundedCornerShape(8.dp),
-              modifier = Modifier.weight(1f)
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Quick Action Buttons
+            Row(
+              modifier = Modifier.fillMaxWidth(),
+              horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-              Icon(imageVector = Icons.Default.Check, contentDescription = null, tint = colors.abyss, modifier = Modifier.size(14.dp))
-              Spacer(modifier = Modifier.width(4.dp))
-              Text("Resolve", color = colors.abyss, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+              // Call Back
+              Button(
+                onClick = {
+                  val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${callAlert.callerNumber}"))
+                  try { context.startActivity(intent) } catch (e: Exception) {}
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = colors.teal),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.weight(1f)
+              ) {
+                Icon(imageVector = Icons.Default.Call, contentDescription = null, modifier = Modifier.size(14.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Call Back", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+              }
+
+              // Email Crew
+              Button(
+                onClick = {
+                  val intent = CallEscalationManager.createEmailEscalationIntent(callAlert, targetAlertEmail)
+                  try {
+                    context.startActivity(Intent.createChooser(intent, "Send Escalation Email"))
+                  } catch (_: Exception) {}
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = colors.coralAlert),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.weight(1f)
+              ) {
+                Icon(imageVector = Icons.Default.Email, contentDescription = null, modifier = Modifier.size(14.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Email Alert", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+              }
+
+              // Mark Reviewed & Clear Alert
+              Button(
+                onClick = {
+                  onMarkReviewed(callAlert.id)
+                  onDismiss()
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = colors.seaGreen),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.weight(1f)
+              ) {
+                Icon(imageVector = Icons.Default.Check, contentDescription = null, tint = colors.abyss, modifier = Modifier.size(14.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Resolve", color = colors.abyss, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+              }
             }
           }
         }

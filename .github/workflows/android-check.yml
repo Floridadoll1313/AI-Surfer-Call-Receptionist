@@ -38,12 +38,14 @@ jobs:
           fi
       - name: Build and test without production Firebase
         env:
+          CALL_TEST: ${{ github.head_ref == 'fix/owner-call-sync' || github.ref_name == 'fix/owner-call-sync' }}
           OWNER_TEST: ${{ github.head_ref == 'fix/kai-owner-lead-client' || github.ref_name == 'fix/kai-owner-lead-client' }}
         run: |
           package=com.aistudio.oceansurfer.kxmvqp
           if [ "$OWNER_TEST" = "true" ]; then package="$package.ownertest"; fi
+          if [ "$CALL_TEST" = "true" ]; then package="$package.calltest"; fi
           echo '{"project_info":{"project_number":"1234567890","project_id":"demo-receptionist-ci"},"client":[{"client_info":{"mobilesdk_app_id":"1:1234567890:android:0123456789abcdef","android_client_info":{"package_name":"'"$package"'"}},"api_key":[{"current_key":"offline-ci-placeholder"}]}],"configuration_version":"1"}' > app/google-services.json
-          gradle --stacktrace -PkaiOwnerTest="$OWNER_TEST" :app:assembleDebug :app:testDebugUnitTest
+          gradle --stacktrace -PkaiCallTest="$CALL_TEST" -PkaiOwnerTest="$OWNER_TEST" :app:assembleDebug :app:testDebugUnitTest
       - uses: actions/upload-artifact@v4
         if: always()
         with:

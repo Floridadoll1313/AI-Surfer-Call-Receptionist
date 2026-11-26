@@ -605,6 +605,22 @@ fun IntegrationsScreen(
 
           Spacer(modifier = Modifier.height(12.dp))
 
+          var ownerEmail by remember { mutableStateOf("") }
+          var ownerPassword by remember { mutableStateOf("") }
+          OutlinedTextField(ownerEmail, { ownerEmail = it }, label = { Text("Owner email for call sync") }, singleLine = true)
+          OutlinedTextField(ownerPassword, { ownerPassword = it }, label = { Text("Owner password") }, singleLine = true,
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Password),
+            visualTransformation = PasswordVisualTransformation())
+          Text("Signing in enables sync of queued call records with the AI SURFER project.")
+          Button(enabled = ownerEmail.isNotBlank() && ownerPassword.isNotEmpty(), onClick = {
+            viewModel.signInForCallSync(ownerEmail, ownerPassword)
+            ownerPassword = ""
+          }) { Text("Sign in for call sync") }
+          OutlinedButton(onClick = {
+            com.example.integrations.OwnerCallSession.clear()
+            viewModel.showSnackbar("Signed out of call sync")
+          }) { Text("Sign out of call sync") }
+
           Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
