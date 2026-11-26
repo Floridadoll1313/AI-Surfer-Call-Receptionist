@@ -74,6 +74,19 @@ class MainActivityLaunchTest {
   }
 
   @Test
+  @Config(sdk = [36], qualifiers = "w360dp-h640dp")
+  fun receptionistConsole_isVisibleBeforeSetupOnCompactPhone() {
+    // The question field and submit control must be reachable before scrolling.
+    composeTestRule.onNodeWithTag("receptionist_test_input").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("receptionist_test_submit").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("console_voice_mic_button").assertIsDisplayed()
+
+    // Setup remains available below the console.
+    composeTestRule.onNodeWithTag("two_phone_status_card").performScrollTo().assertIsDisplayed()
+    composeTestRule.onNodeWithTag("voice_setup_card").performScrollTo().assertIsDisplayed()
+  }
+
+  @Test
   fun releaseOpenAiKey_clearsSavedKeyAndPersistsDisabledState() {
     val context = ApplicationProvider.getApplicationContext<android.content.Context>()
     IntegrationPrefsStore.saveChatGptConfig(
