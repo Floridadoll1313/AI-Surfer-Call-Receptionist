@@ -3,6 +3,9 @@ package com.example
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTextInput
 import com.example.data.local.CallEntity
@@ -100,6 +103,7 @@ class MainActivityLaunchTest {
     composeTestRule.activityRule.scenario.recreate()
     val app = ApplicationProvider.getApplicationContext<OceanSurferApp>()
     runBlocking {
+      app.database.callDao().clearAllCalls()
       app.database.callDao().insertCalls((1..44).map { index ->
         CallEntity(
           callerNumber = "test-$index", callerName = "Test caller",
@@ -113,8 +117,9 @@ class MainActivityLaunchTest {
     composeTestRule.waitUntil(timeoutMillis = 5000) {
       composeTestRule.onAllNodesWithTag("status_bar_alert_pill").fetchSemanticsNodes().isNotEmpty()
     }
-    composeTestRule.onNodeWithTag("status_bar_alert_pill").assertIsDisplayed()
-    composeTestRule.onNodeWithContentDescription("Expand Status Details").performClick()
+    composeTestRule.onNodeWithTag("status_bar_alert_pill").assertIsDisplayed().assertTextContains("44")
+    composeTestRule.onNodeWithContentDescription("Expand Status Details").performSemanticsAction(SemanticsActions.OnClick)
+    composeTestRule.waitForIdle()
     composeTestRule.onNodeWithText("44 Alerts").performScrollTo().assertIsDisplayed()
     composeTestRule.onNode(hasScrollToIndexAction()).performScrollToIndex(1)
     composeTestRule.onNodeWithTag("product_item_1").assertIsDisplayed()
