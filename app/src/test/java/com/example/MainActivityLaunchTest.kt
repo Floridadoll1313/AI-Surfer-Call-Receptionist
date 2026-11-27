@@ -1,8 +1,18 @@
 package com.example
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasScrollToIndexAction
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.performTextInput
+import com.example.data.local.CallEntity
+import org.robolectric.RuntimeEnvironment
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -71,6 +81,52 @@ class MainActivityLaunchTest {
     composeTestRule.onNodeWithTag("phone_verification_card").performScrollTo().assertIsDisplayed()
     composeTestRule.onNodeWithTag("permissions_and_publishing_card").performScrollTo().assertIsDisplayed()
     composeTestRule.onNodeWithTag("chatgpt_integration_card").performScrollTo().assertIsDisplayed()
+  }
+
+  @Test
+  @Config(sdk = [36], qualifiers = "w360dp-h640dp")
+  fun receptionistConsole_isVisibleBeforeSetupOnCompactPhone() {
+    // The question field and submit control must be reachable before scrolling.
+    composeTestRule.onNodeWithTag("receptionist_test_input").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("receptionist_test_submit").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("console_voice_mic_button").assertIsDisplayed()
+
+    // Setup remains available below the console.
+    composeTestRule.onNodeWithTag("two_phone_status_card").performScrollTo().assertIsDisplayed()
+    composeTestRule.onNodeWithTag("voice_setup_card").performScrollTo().assertIsDisplayed()
+  }
+
+  @Test
+  @Config(sdk = [36], qualifiers = "w360dp-h640dp")
+  fun expandedAlerts_leaveProductsAndReceptionistUsableWithLargeText() {
+    RuntimeEnvironment.setFontScale(1.6f)
+    composeTestRule.activityRule.scenario.recreate()
+    val app = ApplicationProvider.getApplicationContext<OceanSurferApp>()
+    runBlocking {
+      app.database.callDao().clearAllCalls()
+      app.database.callDao().insertCalls((1..44).map { index ->
+        CallEntity(
+          callerNumber = "test-$index", callerName = "Test caller",
+          status = "ESCALATED", isEscalated = true, summary = "",
+          transcription = "", customerQuestion = "", aiResponse = ""
+        )
+      })
+    }
+
+    composeTestRule.onNodeWithTag("nav_products").performClick()
+    composeTestRule.waitUntil(timeoutMillis = 5000) {
+      composeTestRule.onAllNodesWithTag("status_bar_alert_pill").fetchSemanticsNodes().isNotEmpty()
+    }
+    composeTestRule.onNodeWithTag("status_bar_alert_pill").assertIsDisplayed().assertTextContains("44")
+    composeTestRule.onNodeWithContentDescription("Expand Status Details").performSemanticsAction(SemanticsActions.OnClick)
+    composeTestRule.waitForIdle()
+    composeTestRule.onNodeWithText("44 Alerts").performScrollTo().assertIsDisplayed()
+    composeTestRule.onNode(hasScrollToIndexAction()).performScrollToIndex(1)
+    composeTestRule.onNodeWithTag("product_item_1").assertIsDisplayed()
+
+    composeTestRule.onNodeWithTag("nav_receptionist").performClick()
+    composeTestRule.onNodeWithTag("receptionist_test_input")
+      .performScrollTo().assertIsDisplayed().performTextInput("What services are available?")
   }
 
   @Test

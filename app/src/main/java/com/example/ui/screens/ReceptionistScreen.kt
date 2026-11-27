@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -193,6 +194,7 @@ fun ReceptionistScreen(
     modifier = modifier
       .fillMaxSize()
       .background(colors.abyss)
+      .imePadding()
       .verticalScroll(scrollState)
   ) {
     OceanWaveHeader(
@@ -205,6 +207,156 @@ fun ReceptionistScreen(
         .fillMaxWidth()
         .padding(16.dp)
     ) {
+      // Keep the console ahead of setup so it is reachable on compact phones.
+      // Section: Ask Kai Receptionist Knowledge Preview (No fake call logged)
+      Text(
+        text = "AI KNOWLEDGE PREVIEW (NO FAKE CALL LOGGED)",
+        style = MaterialTheme.typography.labelMedium,
+        color = colors.cyan,
+        fontWeight = FontWeight.ExtraBold,
+        letterSpacing = 1.sp
+      )
+      Text(
+        text = "Preview how Kai answers business questions using your catalog & FAQs without creating a fake call or alert.",
+        style = MaterialTheme.typography.bodySmall,
+        color = colors.textSecondary,
+        modifier = Modifier.padding(top = 2.dp, bottom = 10.dp)
+      )
+
+      Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = colors.deepBlue)
+      ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+          if (voiceUiState.isListening || voiceUiState.partialTranscript.isNotBlank()) {
+            Surface(
+              shape = RoundedCornerShape(10.dp),
+              color = colors.teal.copy(alpha = 0.2f),
+              modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 8.dp)
+            ) {
+              Text(
+                text = if (voiceUiState.partialTranscript.isNotBlank()) {
+                  "Listening: \"${voiceUiState.partialTranscript}\""
+                } else {
+                  "Listening for Voice-to-Text dictation..."
+                },
+                color = colors.cyan,
+                fontSize = 11.sp,
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+              )
+            }
+          }
+
+          OutlinedTextField(
+            value = testQuestion,
+            onValueChange = { testQuestion = it },
+            placeholder = { Text("Type or tap mic to speak a question...", color = colors.textSecondary, fontSize = 12.sp) },
+            modifier = Modifier
+              .fillMaxWidth()
+              .testTag("receptionist_test_input"),
+            colors = OutlinedTextFieldDefaults.colors(
+              focusedBorderColor = colors.turquoise,
+              unfocusedBorderColor = colors.teal,
+              focusedTextColor = colors.textPrimary,
+              unfocusedTextColor = colors.textPrimary
+            ),
+            leadingIcon = {
+              IconButton(
+                onClick = {
+                  if (voiceUiState.isListening) {
+                    viewModel.stopVoiceListening()
+                  } else if (hasMicPermission) {
+                    viewModel.startConsoleVoiceInput { spokenText ->
+                      testQuestion = spokenText
+                      runTestConsoleQuestion(spokenText)
+                    }
+                  } else {
+                    micConsoleDictateLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                  }
+                },
+                modifier = Modifier
+                  .size(48.dp)
+                  .testTag("console_voice_mic_button")
+              ) {
+                Icon(
+                  imageVector = if (voiceUiState.isListening) Icons.Default.Stop else Icons.Default.Mic,
+                  contentDescription = if (voiceUiState.isListening) "Stop voice input" else "Dictate with Voice-to-Text",
+                  tint = if (voiceUiState.isListening) colors.coralAlert else colors.turquoise
+                )
+              }
+            },
+            trailingIcon = {
+              IconButton(
+                onClick = { runTestConsoleQuestion(testQuestion) },
+                modifier = Modifier
+                  .size(48.dp)
+                  .testTag("receptionist_test_submit")
+              ) {
+                if (isAnsweringTest) {
+                  CircularProgressIndicator(modifier = Modifier.size(18.dp), color = colors.turquoise)
+                } else {
+                  Icon(imageVector = Icons.AutoMirrored.Filled.Send, contentDescription = "Submit", tint = colors.turquoise)
+                }
+              }
+            }
+          )
+
+          testResult?.let { result ->
+            Spacer(modifier = Modifier.height(12.dp))
+            Surface(
+              shape = RoundedCornerShape(12.dp),
+              color = colors.card,
+              modifier = Modifier.fillMaxWidth()
+            ) {
+              Column(modifier = Modifier.padding(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                  Icon(
+                    imageVector = Icons.Default.Surfing,
+                    contentDescription = null,
+                    tint = colors.turquoise,
+                    modifier = Modifier.size(16.dp)
+                  )
+                  Spacer(modifier = Modifier.width(6.dp))
+                  Text(
+                    text = "Kai's AI Answer:",
+                    color = colors.turquoise,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp
+                  )
+                  Spacer(modifier = Modifier.weight(1f))
+                  if (result.requiresImmediateEscalation) {
+                    Surface(
+                      shape = RoundedCornerShape(6.dp),
+                      color = colors.coralAlert
+                    ) {
+                      Text(
+                        text = "AI ESCALATION FLAG",
+                        color = Color.White,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                      )
+                    }
+                  }
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                  text = result.responseText,
+                  color = colors.textPrimary,
+                  fontSize = 13.sp,
+                  lineHeight = 18.sp
+                )
+              }
+            }
+          }
+        }
+      }
+
+      Spacer(modifier = Modifier.height(16.dp))
+
       // Receptionist Status Card
       Card(
         modifier = Modifier
@@ -840,153 +992,6 @@ fun ReceptionistScreen(
       }
 
       Spacer(modifier = Modifier.height(20.dp))
-
-      // Section: Ask Kai Receptionist Knowledge Preview (No fake call logged)
-      Text(
-        text = "AI KNOWLEDGE PREVIEW (NO FAKE CALL LOGGED)",
-        style = MaterialTheme.typography.labelMedium,
-        color = colors.cyan,
-        fontWeight = FontWeight.ExtraBold,
-        letterSpacing = 1.sp
-      )
-      Text(
-        text = "Preview how Kai answers business questions using your catalog & FAQs without creating a fake call or alert.",
-        style = MaterialTheme.typography.bodySmall,
-        color = colors.textSecondary,
-        modifier = Modifier.padding(top = 2.dp, bottom = 10.dp)
-      )
-
-      Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = colors.deepBlue)
-      ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-          if (voiceUiState.isListening || voiceUiState.partialTranscript.isNotBlank()) {
-            Surface(
-              shape = RoundedCornerShape(10.dp),
-              color = colors.teal.copy(alpha = 0.2f),
-              modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 8.dp)
-            ) {
-              Text(
-                text = if (voiceUiState.partialTranscript.isNotBlank()) {
-                  "Listening: \"${voiceUiState.partialTranscript}\""
-                } else {
-                  "Listening for Voice-to-Text dictation..."
-                },
-                color = colors.cyan,
-                fontSize = 11.sp,
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-              )
-            }
-          }
-
-          OutlinedTextField(
-            value = testQuestion,
-            onValueChange = { testQuestion = it },
-            placeholder = { Text("Type or tap mic to speak a question...", color = colors.textSecondary, fontSize = 12.sp) },
-            modifier = Modifier
-              .fillMaxWidth()
-              .testTag("receptionist_test_input"),
-            colors = OutlinedTextFieldDefaults.colors(
-              focusedBorderColor = colors.turquoise,
-              unfocusedBorderColor = colors.teal,
-              focusedTextColor = colors.textPrimary,
-              unfocusedTextColor = colors.textPrimary
-            ),
-            leadingIcon = {
-              IconButton(
-                onClick = {
-                  if (voiceUiState.isListening) {
-                    viewModel.stopVoiceListening()
-                  } else if (hasMicPermission) {
-                    viewModel.startConsoleVoiceInput { spokenText ->
-                      testQuestion = spokenText
-                      runTestConsoleQuestion(spokenText)
-                    }
-                  } else {
-                    micConsoleDictateLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                  }
-                },
-                modifier = Modifier
-                  .size(48.dp)
-                  .testTag("console_voice_mic_button")
-              ) {
-                Icon(
-                  imageVector = if (voiceUiState.isListening) Icons.Default.Stop else Icons.Default.Mic,
-                  contentDescription = if (voiceUiState.isListening) "Stop voice input" else "Dictate with Voice-to-Text",
-                  tint = if (voiceUiState.isListening) colors.coralAlert else colors.turquoise
-                )
-              }
-            },
-            trailingIcon = {
-              IconButton(
-                onClick = { runTestConsoleQuestion(testQuestion) },
-                modifier = Modifier
-                  .size(48.dp)
-                  .testTag("receptionist_test_submit")
-              ) {
-                if (isAnsweringTest) {
-                  CircularProgressIndicator(modifier = Modifier.size(18.dp), color = colors.turquoise)
-                } else {
-                  Icon(imageVector = Icons.AutoMirrored.Filled.Send, contentDescription = "Submit", tint = colors.turquoise)
-                }
-              }
-            }
-          )
-
-          testResult?.let { result ->
-            Spacer(modifier = Modifier.height(12.dp))
-            Surface(
-              shape = RoundedCornerShape(12.dp),
-              color = colors.card,
-              modifier = Modifier.fillMaxWidth()
-            ) {
-              Column(modifier = Modifier.padding(12.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                  Icon(
-                    imageVector = Icons.Default.Surfing,
-                    contentDescription = null,
-                    tint = colors.turquoise,
-                    modifier = Modifier.size(16.dp)
-                  )
-                  Spacer(modifier = Modifier.width(6.dp))
-                  Text(
-                    text = "Kai's AI Answer:",
-                    color = colors.turquoise,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp
-                  )
-                  Spacer(modifier = Modifier.weight(1f))
-                  if (result.requiresImmediateEscalation) {
-                    Surface(
-                      shape = RoundedCornerShape(6.dp),
-                      color = colors.coralAlert
-                    ) {
-                      Text(
-                        text = "AI ESCALATION FLAG",
-                        color = Color.White,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                      )
-                    }
-                  }
-                }
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                  text = result.responseText,
-                  color = colors.textPrimary,
-                  fontSize = 13.sp,
-                  lineHeight = 18.sp
-                )
-              }
-            }
-          }
-        }
-      }
 
       Spacer(modifier = Modifier.height(24.dp))
     }

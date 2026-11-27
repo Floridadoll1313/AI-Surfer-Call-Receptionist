@@ -44,6 +44,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -249,7 +250,7 @@ fun OceanSurferMainContent(
                 modifier = Modifier.size(24.dp)
               )
             },
-            label = { Text("Receptionist", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+            label = { Text("Receptionist", maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 11.sp, fontWeight = FontWeight.Bold) },
             colors = navItemColors,
             modifier = Modifier.testTag("nav_receptionist")
           )
@@ -275,7 +276,7 @@ fun OceanSurferMainContent(
                 )
               }
             },
-            label = { Text("Dashboard", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+            label = { Text("Dashboard", maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 11.sp, fontWeight = FontWeight.Bold) },
             colors = navItemColors,
             modifier = Modifier.testTag("nav_calls")
           )
@@ -290,7 +291,7 @@ fun OceanSurferMainContent(
                 modifier = Modifier.size(24.dp)
               )
             },
-            label = { Text("Client AI", fontSize = 10.sp, fontWeight = FontWeight.Bold) },
+            label = { Text("Client AI", maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 10.sp, fontWeight = FontWeight.Bold) },
             colors = navItemColors,
             modifier = Modifier.testTag("nav_client_hub")
           )
@@ -305,7 +306,7 @@ fun OceanSurferMainContent(
                 modifier = Modifier.size(24.dp)
               )
             },
-            label = { Text("Products", fontSize = 10.sp, fontWeight = FontWeight.Bold) },
+            label = { Text("Products", maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 10.sp, fontWeight = FontWeight.Bold) },
             colors = navItemColors,
             modifier = Modifier.testTag("nav_products")
           )
@@ -320,7 +321,7 @@ fun OceanSurferMainContent(
                 modifier = Modifier.size(24.dp)
               )
             },
-            label = { Text("Settings", fontSize = 10.sp, fontWeight = FontWeight.Bold) },
+            label = { Text("Settings", maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 10.sp, fontWeight = FontWeight.Bold) },
             colors = navItemColors,
             modifier = Modifier.testTag("nav_integrations")
           )

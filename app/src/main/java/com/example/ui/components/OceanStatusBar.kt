@@ -25,6 +25,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -122,6 +127,7 @@ fun OceanStatusBar(
       Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
+          .weight(1f)
           .clickable { isExpanded = !isExpanded }
           .padding(vertical = 4.dp)
       ) {
@@ -136,6 +142,8 @@ fun OceanStatusBar(
 
         Text(
           text = if (isOnline) "AI SURFER LIVE" else "STANDBY",
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
           color = if (isOnline) colors.seaGreen else colors.textSecondary,
           fontSize = 11.sp,
           fontWeight = FontWeight.ExtraBold,
@@ -162,6 +170,8 @@ fun OceanStatusBar(
             Spacer(modifier = Modifier.width(3.dp))
             Text(
               text = activeDeviceLineLabel.uppercase(),
+              maxLines = 1,
+              overflow = TextOverflow.Ellipsis,
               color = colors.cyan,
               fontSize = 9.sp,
               fontWeight = FontWeight.Bold
@@ -170,7 +180,7 @@ fun OceanStatusBar(
         }
       }
 
-      Spacer(modifier = Modifier.weight(1f))
+      Spacer(modifier = Modifier.width(4.dp))
 
       // Call Alerts Status Pill
       if (escalatedCount > 0) {
@@ -188,13 +198,15 @@ fun OceanStatusBar(
           ) {
             Icon(
               imageVector = Icons.Default.NotificationsActive,
-              contentDescription = "Alerts",
+              contentDescription = "Call alerts",
               tint = Color.White,
               modifier = Modifier.size(12.dp)
             )
             Spacer(modifier = Modifier.width(4.dp))
             Text(
-              text = "⚠️ $escalatedCount CALL ALERT${if (escalatedCount > 1) "S" else ""}",
+              text = escalatedCount.toString(),
+              maxLines = 1,
+              overflow = TextOverflow.Ellipsis,
               color = Color.White,
               fontSize = 10.sp,
               fontWeight = FontWeight.ExtraBold
@@ -221,6 +233,8 @@ fun OceanStatusBar(
             Spacer(modifier = Modifier.width(4.dp))
             Text(
               text = if (pendingCount > 0) "$pendingCount Pending" else "2-Phone Guard Ready",
+              maxLines = 1,
+              overflow = TextOverflow.Ellipsis,
               color = if (pendingCount > 0) colors.sunsetOrange else colors.seaGreen,
               fontSize = 10.sp,
               fontWeight = FontWeight.Bold
@@ -254,7 +268,9 @@ fun OceanStatusBar(
       Column(
         modifier = Modifier
           .fillMaxWidth()
+          .heightIn(max = (LocalConfiguration.current.screenHeightDp / 5).dp)
           .background(colors.deepBlue)
+          .verticalScroll(rememberScrollState())
           .padding(horizontal = 14.dp, vertical = 8.dp)
       ) {
         // Detailed metrics strip
